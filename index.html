@@ -30,7 +30,6 @@
         </header>
 
         <main class="p-4">
-
             <div id="tab-daily" class="tab-content active">
                 <div class="flex items-center justify-between mb-5">
                     <h2 class="text-lg font-extrabold">บันทึกเวลาวันนี้</h2>
@@ -58,7 +57,6 @@
                     <p class="text-center text-slate-400 text-xs py-10 col-span-2"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลดข้อมูล...</p>
                 </div>
             </div>
-
         </main>
 
         <nav class="fixed bottom-0 w-full max-w-md bg-white/90 backdrop-blur-md border-t border-slate-100 flex justify-around items-center pt-3 px-2 z-30 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)]" style="padding-bottom: env(safe-area-inset-bottom);">
@@ -76,7 +74,7 @@
             </button>
         </nav>
 
-        <div id="profileModal" class="fixed inset-0 bg-white z-50 flex flex-col transform translate-y-full transition-transform duration-300 ease-out">
+        <div id="profileModal" class="fixed inset-0 bg-white z-40 flex flex-col transform translate-y-full transition-transform duration-300 ease-out">
             <div class="bg-slate-50 px-6 py-6 flex items-center justify-between border-b border-slate-100 pt-safe" style="padding-top: env(safe-area-inset-top);">
                 <button onclick="closeProfile()" class="h-10 w-10 flex items-center justify-center rounded-xl bg-white shadow-sm text-slate-800">
                     <i class="fa-solid fa-arrow-left"></i>
@@ -108,29 +106,36 @@
             </div>
         </div>
 
+        <div id="imageViewerModal" class="fixed inset-0 bg-black/90 z-50 hidden flex-col items-center justify-center transition-opacity" style="padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);">
+            <button onclick="closeImageViewer()" class="absolute top-6 right-6 bg-white/20 text-white rounded-full h-10 w-10 flex items-center justify-center hover:bg-white/40 backdrop-blur-md z-50">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+            
+            <div class="w-full h-full flex items-center justify-center p-4">
+                <img id="viewerImage" src="" alt="Evidence" class="max-w-full max-h-full rounded-xl object-contain shadow-2xl">
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // ลิงก์ API ของคุณทนาย
+        // ลิงก์ API
         const API_URL = "https://script.google.com/macros/s/AKfycbwSBHeswptojhNiHKeIsgo3cwaTEjOfBqPhJnY8GmGw_abhfPMk87FEA5dGm1j27gLm3A/exec";
         let allData = [];
 
-        // เซ็ตวันที่ปัจจุบันในช่องค้นหา
         document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
 
-        // ดึงข้อมูลจาก API
         async function fetchData() {
             try {
                 const response = await fetch(API_URL);
                 const rawData = await response.json();
                 
-                // จัดระเบียบข้อมูลตามลำดับคอลัมน์ (ตัดปัญหาหัวตารางพิมพ์ผิด)
                 allData = rawData.map(item => {
                     const keys = Object.keys(item);
                     return {
-                        time: item[keys[0]] || "",  // คอลัมน์ A: เวลา
-                        name: item[keys[2]] || "ไม่ระบุ", // คอลัมน์ C: ชื่อพนักงาน
-                        image: item[keys[3]] || ""  // คอลัมน์ D: รูปลิงก์ Drive
+                        time: item[keys[0]] || "", 
+                        name: item[keys[2]] || "ไม่ระบุ", 
+                        image: item[keys[3]] || "" 
                     };
                 });
                 
@@ -145,7 +150,6 @@
             }
         }
 
-        // ฟังก์ชันสลับเมนู
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(el => {
@@ -157,7 +161,6 @@
             document.getElementById('nav-' + tabId).classList.remove('text-slate-300');
         }
 
-        // ฟังก์ชันแสดงข้อมูลหน้ารายวัน (กรองตามวันที่)
         function renderDaily() {
             const selectedDate = document.getElementById('dateFilter').value;
             const dailyData = allData.filter(item => item.time.startsWith(selectedDate));
@@ -170,7 +173,7 @@
 
             container.innerHTML = dailyData.map(item => {
                 const timeOnly = item.time.split(' ')[1] || item.time;
-                const isLate = timeOnly > "08:40:00"; // เช็กสายเกิน 08:40
+                const isLate = timeOnly > "08:40:00"; 
 
                 return `
                     <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
@@ -189,7 +192,6 @@
             }).join('');
         }
 
-        // ฟังก์ชันแสดงสถิติคนมาสาย
         function renderStats() {
             const empNames = [...new Set(allData.map(item => item.name).filter(n => n))];
             const container = document.getElementById('statsContainer');
@@ -229,7 +231,6 @@
             container.innerHTML = html || '<div class="bg-emerald-50 p-6 rounded-3xl text-center border border-emerald-100"><i class="fa-solid fa-trophy text-emerald-500 text-3xl mb-3"></i><p class="text-emerald-700 font-bold text-sm">ยอดเยี่ยม! เดือนนี้ยังไม่มีพนักงานมาสาย</p></div>';
         }
 
-        // ฟังก์ชันแสดงรายชื่อพนักงานทั้งหมด
         function renderEmployeeList() {
             const empNames = [...new Set(allData.map(item => item.name).filter(n => n))];
             const container = document.getElementById('usersContainer');
@@ -248,7 +249,6 @@
             }).join('');
         }
 
-        // ฟังก์ชันเปิดดูประวัติส่วนตัว
         function openProfile(name) {
             const empLogs = allData.filter(item => item.name === name);
             const lateLogs = empLogs.filter(item => (item.time.split(' ')[1] || "") > "08:40:00");
@@ -263,11 +263,12 @@
                 const timeOnly = item.time.split(' ')[1] || item.time;
                 const isLate = timeOnly > "08:40:00";
                 
+                // แก้ไข: เปลี่ยนจาก <a> เป็น <button> เพื่อกดแล้วเปิดรูปในแอป
                 return `
                     <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
                         <div>
                             <span class="text-xs font-bold text-slate-600 block">${dateObj}</span>
-                            ${item.image && item.image.includes('http') ? `<a href="${item.image}" target="_blank" class="text-[10px] text-blue-600 font-bold uppercase tracking-tight mt-1 inline-block hover:underline"><i class="fa-solid fa-image mr-1"></i>ดูรูปหลักฐาน</a>` : ''}
+                            ${item.image && item.image.includes('http') ? `<button onclick="openImageViewer('${item.image}')" class="text-[10px] text-blue-600 font-bold uppercase tracking-tight mt-1 inline-block hover:underline text-left"><i class="fa-solid fa-image mr-1"></i>ดูรูปหลักฐาน</button>` : ''}
                         </div>
                         <span class="text-xs font-black ${isLate ? 'text-rose-600' : 'text-slate-900'}">${timeOnly}</span>
                     </div>
@@ -282,10 +283,35 @@
             document.getElementById('profileModal').classList.add('translate-y-full');
         }
 
-        // จับเหตุการณ์เมื่อเลือกวันที่ให้โหลดข้อมูลหน้ารายวันใหม่
+        // ฟังก์ชันใหม่: แปลงลิงก์ Google Drive แล้วเปิดรูปซ้อนทับในแอป
+        function openImageViewer(driveUrl) {
+            let directImageUrl = driveUrl;
+            
+            // ใช้ Regex ดึง File ID ออกมาจากลิงก์ Google Drive เพื่อแปลงเป็นลิงก์รูปภาพโดยตรง
+            const match = driveUrl.match(/\/d\/(.+?)\//);
+            if (match && match[1]) {
+                directImageUrl = `https://drive.google.com/uc?export=view&id=${match[1]}`;
+            }
+
+            // ใส่รูปลงไป
+            document.getElementById('viewerImage').src = directImageUrl;
+            
+            // แสดงหน้าต่าง Pop-up
+            const viewerModal = document.getElementById('imageViewerModal');
+            viewerModal.classList.remove('hidden');
+            viewerModal.classList.add('flex');
+        }
+
+        // ฟังก์ชันใหม่: ปิดหน้าต่างดูรูป
+        function closeImageViewer() {
+            const viewerModal = document.getElementById('imageViewerModal');
+            viewerModal.classList.add('hidden');
+            viewerModal.classList.remove('flex');
+            document.getElementById('viewerImage').src = ""; // ล้างรูปออกเพื่อไม่ให้ค้างตอนเปิดคนอื่น
+        }
+
         document.getElementById('dateFilter').addEventListener('change', renderDaily);
 
-        // เริ่มดึงข้อมูลเมื่อเปิดหน้าเว็บ
         fetchData();
     </script>
 </body>
