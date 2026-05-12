@@ -38,7 +38,7 @@
                     </div>
                 </div>
                 <div id="dailyContainer" class="space-y-3">
-                    <p class="text-center text-slate-400 text-xs py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลดข้อมูล...</p>
+                    <p class="text-center text-slate-400 text-xs py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังดึงข้อมูลล่าสุด...</p>
                 </div>
             </div>
 
@@ -113,80 +113,76 @@
 
     <div id="loadingOverlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-[100] hidden flex-col items-center justify-center">
         <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-600 mb-3"></i>
-        <p class="font-bold text-slate-800">กำลังอัปเดตข้อมูล...</p>
+        <p class="font-bold text-slate-800">กำลังดำเนินการ...</p>
     </div>
 
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbwSBHeswptojhNiHKeIsgo3cwaTEjOfBqPhJnY8GmGw_abhfPMk87FEA5dGm1j27gLm3A/exec";
         let allData = [];
 
-        // เซ็ตวันที่ปัจจุบันให้ตรงกับเครื่องผู้ใช้แบบแม่นยำ
+        // ตั้งค่าวันที่ปัจจุบันให้ตรงกับมือถือ
         const today = new Date();
-        const localDate = today.toLocaleDateString('en-CA'); // ได้ฟอร์แมต YYYY-MM-DD ชัวร์ๆ
+        const localDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
         document.getElementById('dateFilter').value = localDate;
 
-        // ฟังก์ชันครอบจักรวาล: ล้างปัญหาเวลา 13:00 เป็น 01:00
+        // ฟังก์ชันอ่านวันที่และเวลาขั้นสูง (ไม่พลาดทุกกรณี)
         function formatDateTime(rawString) {
-            if (!rawString || rawString === "undefined") return { dateStr: "", timeStr: "", isLate: false };
+            if (!rawString || String(rawString).trim() === "" || rawString === "undefined") return { dateStr: "", timeStr: "", isLate: false };
             
-            let cleanStr = String(rawString).trim();
-            
-            // กรณีเป็น ISO String (มี T และ Z) ให้ตัดทิ้งให้หมด
-            cleanStr = cleanStr.replace('T', ' ').replace('Z', '').split('.')[0];
-            let parts = cleanStr.split(' ');
+            let cleanStr = String(rawString).replace('T', ' ').replace('Z', '').trim();
+            let parts = cleanStr.split(/\s+/);
             
             let d = parts[0] || ""; 
             let t = parts[1] || "00:00:00"; 
             
-            // 1. จัดการวันที่ให้อยู่ในฟอร์แมต YYYY-MM-DD
+            // 1. แปลงวันที่ให้เป็น YYYY-MM-DD เสมอ
+            let finalDate = d;
             if (d.includes('/')) {
-                let dp = d.split('/');
-                if (dp.length === 3) {
-                    if(dp[2].length === 4) { d = `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`; } 
-                    else if (dp[0].length === 4) { d = `${dp[0]}-${dp[1].padStart(2,'0')}-${dp[2].padStart(2,'0')}`; }
+                let p = d.split('/');
+                if (p.length === 3) {
+                    if (p[2].length >= 4) { finalDate = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`; } 
+                    else if (p[0].length >= 4) { finalDate = `${p[0]}-${p[1].padStart(2,'0')}-${p[2].padStart(2,'0')}`; }
                 }
             } else if (d.includes('-')) {
-                let dp = d.split('-');
-                if (dp.length === 3 && dp[2].length === 4) { d = `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`; }
+                let p = d.split('-');
+                if (p.length === 3) {
+                    if (p[2].length >= 4) { finalDate = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`; } 
+                    else if (p[0].length >= 4) { finalDate = `${p[0]}-${p[1].padStart(2,'0')}-${p[2].padStart(2,'0')}`; }
+                }
             }
 
-            // 2. จัดการเวลา แปลง AM/PM ให้เป็น 24 ชม.
+            // 2. แปลงเวลาและแก้ปัญหา PM (บ่าย)
             let tParts = t.split(':');
             let h = parseInt(tParts[0] || 0, 10);
             let m = parseInt(tParts[1] || 0, 10);
             let s = parseInt(tParts[2] || 0, 10);
 
-            // เช็กระบบ AM/PM ที่อาจจะมาในก้อนข้อมูล
             let ampm = "";
-            if (parts.length > 2) {
-                ampm = parts[2].toUpperCase();
-            } else if (t.toUpperCase().includes('PM') || t.toUpperCase().includes('AM')) {
-                ampm = t.toUpperCase().replace(/[^A-Z]/g, '');
-            }
+            if (parts.length > 2) ampm = parts[2].toUpperCase();
+            else if (t.toUpperCase().includes('PM') || t.toUpperCase().includes('AM')) ampm = t.toUpperCase().replace(/[^A-Z]/g, '');
 
-            if (ampm === 'PM' || ampm === 'หลังเที่ยง') {
-                if (h < 12) h += 12;
-            } else if (ampm === 'AM' || ampm === 'ก่อนเที่ยง') {
-                if (h === 12) h = 0;
-            }
+            if (ampm === 'PM' || ampm === 'หลังเที่ยง') { if (h < 12) h += 12; }
+            else if (ampm === 'AM' || ampm === 'ก่อนเที่ยง') { if (h === 12) h = 0; }
 
             let finalTime = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-            let isLate = finalTime > "08:40:00";
 
-            return { dateStr: d, timeStr: finalTime, isLate: isLate };
+            return { dateStr: finalDate, timeStr: finalTime, isLate: finalTime > "08:40:00" };
         }
 
         async function fetchData() {
             try {
-                const response = await fetch(API_URL);
+                // เคล็ดลับที่ 1: ใส่ timestamp ต่อท้าย URL เพื่อทะลวงระบบ Cache ของมือถือ 100%
+                const nocacheUrl = API_URL + "?timestamp=" + new Date().getTime();
+                const response = await fetch(nocacheUrl, { cache: "no-store" });
                 const data = await response.json();
                 
+                // เคล็ดลับที่ 2: ดึงข้อมูลแบบครอบจักรวาล ไม่ว่าหลังบ้านจะตั้งชื่อคอลัมน์ว่าอะไร
                 allData = data.map(item => {
-                    // รองรับทั้งคีย์ใหม่และคีย์เก่า เพื่อป้องกันแอปพัง
-                    const rawTime = item.time || item[Object.keys(item)[0]];
-                    const rawUserId = item.userId || item[Object.keys(item)[1]];
-                    const rawName = item.name || item[Object.keys(item)[2]];
-                    const rawImage = item.image || item[Object.keys(item)[3]];
+                    const keys = Object.keys(item);
+                    const rawTime = item.time || item["เวลา"] || item[keys[0]];
+                    const rawUserId = item.userId || item["ID"] || item[keys[1]];
+                    const rawName = item.name || item["ชื่อ"] || item[keys[2]];
+                    const rawImage = item.image || item["รูป"] || item[keys[3]];
 
                     const timeData = formatDateTime(rawTime);
                     
@@ -205,7 +201,7 @@
                 renderEmployeeList();
             } catch (error) {
                 console.error(error);
-                document.getElementById('dailyContainer').innerHTML = '<p class="text-center text-rose-500 text-xs py-10">เกิดข้อผิดพลาดในการดึงข้อมูล</p>';
+                document.getElementById('dailyContainer').innerHTML = '<p class="text-center text-rose-500 text-xs py-10">เกิดข้อผิดพลาดในการดึงข้อมูล โปรดลองอีกครั้ง</p>';
             }
         }
 
@@ -214,8 +210,14 @@
             const dailyData = allData.filter(item => item.dateStr === selectedDate);
             const container = document.getElementById('dailyContainer');
             
+            // เพิ่มระบบ Debug แจ้งเตือนถ้าระบบหาข้อมูลของวันนี้ไม่เจอ
             if (dailyData.length === 0) {
-                container.innerHTML = '<p class="text-center text-slate-400 text-xs py-10">ไม่มีบันทึกการเข้างานในวันนี้</p>';
+                let debugDates = [...new Set(allData.map(d => d.dateStr).filter(d => d !== ""))].slice(0, 3).join(', ');
+                container.innerHTML = `
+                    <div class="text-center py-10">
+                        <p class="text-slate-500 font-bold text-sm mb-2">ไม่มีบันทึกการเข้างานในวันนี้</p>
+                        <p class="text-[10px] text-slate-400">ระบบพบข้อมูลล่าสุดวันที่: ${debugDates || 'ยังไม่มีข้อมูลในระบบ'}</p>
+                    </div>`;
                 return;
             }
 
