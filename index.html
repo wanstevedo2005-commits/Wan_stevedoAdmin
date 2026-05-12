@@ -117,19 +117,37 @@
     </div>
 
     <script>
-        // ลิงก์ API (ใช้ลิงก์เดิมได้เลย)
+        // ลิงก์ API (ลิงก์เดิมของคุณทนาย)
         const API_URL = "https://script.google.com/macros/s/AKfycbwSBHeswptojhNiHKeIsgo3cwaTEjOfBqPhJnY8GmGw_abhfPMk87FEA5dGm1j27gLm3A/exec";
         let allData = [];
 
-        document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
+        // ตั้งค่าวันที่ปัจจุบัน (อิงตาม Local Time ป้องกันปัญหาข้ามวัน)
+        const today = new Date();
+        const localDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        document.getElementById('dateFilter').value = localDate;
 
-        // ระบบผ่าตัดเวลา (ฆ่า T และ Z ทิ้งแบบเด็ดขาด)
+        // **จุดสำคัญที่แก้ไข:** ระบบผ่าตัดเวลาขั้นสูง รองรับทั้ง DD/MM/YYYY และ YYYY-MM-DD
         function formatDateTime(rawString) {
             if (!rawString) return { dateStr: "", timeStr: "", isLate: false };
             let cleanStr = String(rawString).replace('T', ' ').replace('Z', '').split('.')[0]; 
             let parts = cleanStr.split(' ');
-            let d = parts[0];
-            let t = parts[1] || "00:00:00";
+            let d = parts[0]; // ส่วนวันที่
+            let t = parts[1] || "00:00:00"; // ส่วนเวลา
+            
+            // ถ้าวันที่เป็นแบบไทย (DD/MM/YYYY) ให้สลับเป็นแบบสากล (YYYY-MM-DD) เพื่อให้แอปค้นหาเจอ
+            if (d.includes('/')) {
+                let dParts = d.split('/');
+                if (dParts.length === 3) {
+                    d = dParts[2] + '-' + dParts[1].padStart(2, '0') + '-' + dParts[0].padStart(2, '0');
+                }
+            }
+
+            // เติม 0 ให้เวลาถ้าจำเป็น (เช่น 8:15:00 กลายเป็น 08:15:00) ป้องกันการเปรียบเทียบเวลาผิดพลาด
+            let tParts = t.split(':');
+            if (tParts.length >= 2) {
+                t = tParts[0].padStart(2, '0') + ':' + tParts[1].padStart(2, '0') + ':' + (tParts[2] ? tParts[2].padStart(2, '0') : '00');
+            }
+
             return { dateStr: d, timeStr: t, isLate: t > "08:40:00" };
         }
 
@@ -178,7 +196,7 @@
                             <div class="h-12 w-12 rounded-2xl ${item.isLate ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-xl shadow-sm">${isUnknown ? '?' : item.name.charAt(0)}</div>
                             <div>
                                 <h3 class="font-bold text-slate-800 flex items-center">
-                                    ${isUnknown ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]">กดเพื่อใส่ชื่อ</button>` : `คุณ${item.name}`}
+                                    ${isUnknown ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]"><i class="fa-solid fa-pen mr-1"></i>ใส่ชื่อ</button>` : `คุณ${item.name}`}
                                 </h3>
                                 <p class="text-[11px] ${item.isLate ? 'text-rose-400 font-bold' : 'text-slate-400 font-medium'}">เข้างาน: ${item.timeStr}</p>
                             </div>
@@ -191,7 +209,6 @@
             }).join('');
         }
 
-        // --- ระบบอัปเดตชื่อ ส่งตรงเข้า Google Sheets ---
         async function editNamePrompt(userId) {
             const newName = prompt("กรุณาระบุชื่อของพนักงานท่านนี้:");
             if (newName && newName.trim() !== "") {
@@ -201,7 +218,7 @@
                     const res = await fetch(`${API_URL}?action=update_name&userId=${encodeURIComponent(userId)}&newName=${encodeURIComponent(newName.trim())}`);
                     const data = await res.json();
                     if (data.status === "success") {
-                        await fetchData(); // โหลดข้อมูลใหม่ทั้งหมด
+                        await fetchData(); 
                     }
                 } catch(e) {
                     alert("เกิดข้อผิดพลาดในการบันทึกชื่อ");
