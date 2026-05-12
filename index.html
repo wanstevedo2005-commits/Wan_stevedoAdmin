@@ -34,7 +34,7 @@
                 <div class="flex items-center justify-between mb-5">
                     <h2 class="text-lg font-extrabold">บันทึกเวลาวันนี้</h2>
                     <div class="relative">
-                        <input type="date" id="dateFilter" class="bg-white border-0 shadow-sm text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-slate-600 font-bold">
+                        <input type="date" id="dateFilter" class="bg-white border-0 shadow-sm text-sm rounded-xl px-4 py-2 outline-none text-slate-600 font-bold">
                     </div>
                 </div>
                 <div id="dailyContainer" class="space-y-3">
@@ -43,19 +43,13 @@
             </div>
 
             <div id="tab-stats" class="tab-content">
-                <div class="flex items-center justify-between mb-5">
-                    <h2 class="text-lg font-extrabold text-slate-800 text-center">สถิติการมาสาย</h2>
-                </div>
-                <div id="statsContainer" class="space-y-4">
-                    <p class="text-center text-slate-400 text-xs py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลดข้อมูล...</p>
-                </div>
+                <h2 class="text-lg font-extrabold text-slate-800 text-center mb-5">สถิติการมาสาย</h2>
+                <div id="statsContainer" class="space-y-4"></div>
             </div>
 
             <div id="tab-users" class="tab-content">
                 <h2 class="text-lg font-extrabold text-slate-800 mb-5">ทะเบียนพนักงาน</h2>
-                <div id="usersContainer" class="grid grid-cols-2 gap-4">
-                    <p class="text-center text-slate-400 text-xs py-10 col-span-2"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลดข้อมูล...</p>
-                </div>
+                <div id="usersContainer" class="grid grid-cols-2 gap-4"></div>
             </div>
         </main>
 
@@ -69,7 +63,7 @@
                 <span class="text-[9px] font-black uppercase">History</span>
             </button>
             <button onclick="switchTab('users')" id="nav-users" class="nav-btn w-1/3 py-2 flex flex-col items-center text-slate-300 transition-all">
-                <i class="fa-solid fa-id-card-clip text-xl mb-1"></i>
+                <i class="fa-solid fa-users text-xl mb-1"></i>
                 <span class="text-[9px] font-black uppercase">Staff</span>
             </button>
         </nav>
@@ -82,13 +76,14 @@
                 <span class="font-black text-slate-900">Personnel Record</span>
                 <div class="w-10"></div>
             </div>
-
             <div class="flex-1 overflow-y-auto p-6">
                 <div class="text-center mb-8">
                     <div class="h-24 w-24 mx-auto rounded-3xl bg-slate-100 text-slate-800 flex justify-center items-center font-black text-4xl mb-4 shadow-sm" id="modalIcon">?</div>
-                    <h3 class="font-black text-2xl text-slate-900" id="modalName">-</h3>
+                    <h3 class="font-black text-2xl text-slate-900 flex justify-center items-center" id="modalName">
+                        - 
+                        <button id="btnEditProfile" class="ml-3 text-sm bg-blue-100 text-blue-600 w-8 h-8 rounded-full hidden"><i class="fa-solid fa-pen"></i></button>
+                    </h3>
                 </div>
-
                 <div class="grid grid-cols-2 gap-4 mb-8">
                     <div class="bg-indigo-600 rounded-3xl p-5 text-center text-white shadow-blue-200 shadow-lg">
                         <p class="text-[10px] opacity-70 mb-1 font-bold">WORK DAYS</p>
@@ -99,10 +94,8 @@
                         <p class="text-3xl font-black text-rose-600" id="modalLate">0</p>
                     </div>
                 </div>
-
                 <h4 class="font-black text-slate-800 mb-4 text-xs uppercase tracking-widest">Attendance Logs</h4>
-                <div class="space-y-3" id="modalLogs">
-                    </div>
+                <div class="space-y-3" id="modalLogs"></div>
             </div>
         </div>
 
@@ -110,9 +103,7 @@
             <div class="w-full h-[80vh] max-w-lg bg-white rounded-2xl overflow-hidden relative shadow-2xl flex flex-col">
                 <div class="bg-slate-900 px-4 py-3 flex justify-between items-center">
                     <span class="text-white text-sm font-bold"><i class="fa-solid fa-image mr-2"></i>หลักฐานการลงเวลา</span>
-                    <button onclick="closeImageViewer()" class="bg-rose-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-rose-600">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
+                    <button onclick="closeImageViewer()" class="bg-rose-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-rose-600"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <iframe id="viewerIframe" src="" class="w-full flex-1 border-0 bg-slate-100"></iframe>
             </div>
@@ -120,34 +111,26 @@
 
     </div>
 
+    <div id="loadingOverlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-[100] hidden flex-col items-center justify-center">
+        <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-600 mb-3"></i>
+        <p class="font-bold text-slate-800">กำลังอัปเดตข้อมูล...</p>
+    </div>
+
     <script>
-        // ลิงก์ API
+        // ลิงก์ API (ใช้ลิงก์เดิมได้เลย)
         const API_URL = "https://script.google.com/macros/s/AKfycbwSBHeswptojhNiHKeIsgo3cwaTEjOfBqPhJnY8GmGw_abhfPMk87FEA5dGm1j27gLm3A/exec";
         let allData = [];
 
-        // ตั้งค่าวันที่ปัจจุบันให้ตรงกับเวลาเครื่อง (ป้องกันปัญหา Timezone)
-        const today = new Date();
-        const localDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-        document.getElementById('dateFilter').value = localDate;
+        document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
 
-        // ฟังก์ชันใหม่: แปลงเวลาทุกรูปแบบให้เป็นมาตรฐาน (แก้ปัญหา T และ Z ทำให้ข้อมูลรวน)
+        // ระบบผ่าตัดเวลา (ฆ่า T และ Z ทิ้งแบบเด็ดขาด)
         function formatDateTime(rawString) {
             if (!rawString) return { dateStr: "", timeStr: "", isLate: false };
-            let dt = new Date(rawString);
-            
-            // ตรวจสอบว่ามี T และ Z หรือไม่
-            if (!isNaN(dt.getTime()) && rawString.includes('T')) {
-                // แปลงเป็น YYYY-MM-DD
-                const d = dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, '0') + "-" + String(dt.getDate()).padStart(2, '0');
-                // แปลงเป็น HH:mm:ss
-                const t = String(dt.getHours()).padStart(2, '0') + ":" + String(dt.getMinutes()).padStart(2, '0') + ":" + String(dt.getSeconds()).padStart(2, '0');
-                return { dateStr: d, timeStr: t, isLate: t > "08:40:00" };
-            } else {
-                // กรณีที่เป็น Text ธรรมดา
-                const d = rawString.split(' ')[0] || "";
-                const t = rawString.split(' ')[1] || rawString;
-                return { dateStr: d, timeStr: t, isLate: t > "08:40:00" };
-            }
+            let cleanStr = String(rawString).replace('T', ' ').replace('Z', '').split('.')[0]; 
+            let parts = cleanStr.split(' ');
+            let d = parts[0];
+            let t = parts[1] || "00:00:00";
+            return { dateStr: d, timeStr: t, isLate: t > "08:40:00" };
         }
 
         async function fetchData() {
@@ -155,12 +138,11 @@
                 const response = await fetch(API_URL);
                 const rawData = await response.json();
                 
-                // แปลงและจัดระเบียบข้อมูลใหม่ทั้งหมด
                 allData = rawData.map(item => {
                     const keys = Object.keys(item);
-                    const timeData = formatDateTime(item[keys[0]]); // ประมวลผลเวลาตรงนี้เลย
-                    
+                    const timeData = formatDateTime(item[keys[0]]);
                     return {
+                        userId: item[keys[1]] || "", 
                         dateStr: timeData.dateStr,
                         timeStr: timeData.timeStr,
                         isLate: timeData.isLate,
@@ -173,39 +155,31 @@
                 renderStats();
                 renderEmployeeList();
             } catch (error) {
+                console.error(error);
                 document.getElementById('dailyContainer').innerHTML = '<p class="text-center text-rose-500 text-xs py-10">ไม่สามารถเชื่อมต่อฐานข้อมูลได้</p>';
             }
         }
 
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(el => {
-                el.classList.remove('nav-active');
-                el.classList.add('text-slate-300');
-            });
-            document.getElementById('tab-' + tabId).classList.add('active');
-            document.getElementById('nav-' + tabId).classList.add('nav-active');
-            document.getElementById('nav-' + tabId).classList.remove('text-slate-300');
-        }
-
         function renderDaily() {
             const selectedDate = document.getElementById('dateFilter').value;
-            // กรองข้อมูลด้วย dateStr ที่แปลงมาตรฐานแล้ว
             const dailyData = allData.filter(item => item.dateStr === selectedDate);
-            
             const container = document.getElementById('dailyContainer');
+            
             if (dailyData.length === 0) {
                 container.innerHTML = '<p class="text-center text-slate-400 text-xs py-10">ไม่มีบันทึกการเข้างานในวันนี้</p>';
                 return;
             }
 
             container.innerHTML = dailyData.map(item => {
+                const isUnknown = item.name.includes("พนักงานใหม่");
                 return `
                     <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
                         <div class="flex items-center space-x-4">
-                            <div class="h-12 w-12 rounded-2xl ${item.isLate ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-xl shadow-sm">${item.name.charAt(0)}</div>
+                            <div class="h-12 w-12 rounded-2xl ${item.isLate ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-xl shadow-sm">${isUnknown ? '?' : item.name.charAt(0)}</div>
                             <div>
-                                <h3 class="font-bold text-slate-800">คุณ${item.name}</h3>
+                                <h3 class="font-bold text-slate-800 flex items-center">
+                                    ${isUnknown ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]">กดเพื่อใส่ชื่อ</button>` : `คุณ${item.name}`}
+                                </h3>
                                 <p class="text-[11px] ${item.isLate ? 'text-rose-400 font-bold' : 'text-slate-400 font-medium'}">เข้างาน: ${item.timeStr}</p>
                             </div>
                         </div>
@@ -217,20 +191,38 @@
             }).join('');
         }
 
+        // --- ระบบอัปเดตชื่อ ส่งตรงเข้า Google Sheets ---
+        async function editNamePrompt(userId) {
+            const newName = prompt("กรุณาระบุชื่อของพนักงานท่านนี้:");
+            if (newName && newName.trim() !== "") {
+                document.getElementById('loadingOverlay').classList.remove('hidden');
+                document.getElementById('loadingOverlay').classList.add('flex');
+                try {
+                    const res = await fetch(`${API_URL}?action=update_name&userId=${encodeURIComponent(userId)}&newName=${encodeURIComponent(newName.trim())}`);
+                    const data = await res.json();
+                    if (data.status === "success") {
+                        await fetchData(); // โหลดข้อมูลใหม่ทั้งหมด
+                    }
+                } catch(e) {
+                    alert("เกิดข้อผิดพลาดในการบันทึกชื่อ");
+                }
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                document.getElementById('loadingOverlay').classList.remove('flex');
+            }
+        }
+
         function renderStats() {
-            const empNames = [...new Set(allData.map(item => item.name).filter(n => n))];
+            const users = [...new Set(allData.map(i => i.userId).filter(u => u))];
             const container = document.getElementById('statsContainer');
             let html = '';
             
-            empNames.forEach(name => {
-                const empLogs = allData.filter(item => item.name === name);
-                const lateLogs = empLogs.filter(item => item.isLate); // ใช้ค่าที่เช็กมาแล้ว
+            users.forEach(uid => {
+                const logs = allData.filter(i => i.userId === uid);
+                const lateLogs = logs.filter(i => i.isLate);
+                const name = logs[0].name;
                 
-                if (lateLogs.length > 0) {
-                    const lateDates = lateLogs.map(item => {
-                        return `<span class="bg-slate-50 text-slate-600 text-[10px] px-2 py-1 rounded-md border border-slate-100 font-medium shadow-sm">${item.dateStr}</span>`;
-                    }).join('');
-
+                if (lateLogs.length > 0 && !name.includes("พนักงานใหม่")) {
+                    const lateDates = lateLogs.map(item => `<span class="bg-slate-50 text-slate-600 text-[10px] px-2 py-1 rounded-md border border-slate-100 font-medium shadow-sm">${item.dateStr}</span>`).join('');
                     html += `
                         <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
                             <div class="flex items-center justify-between mb-4">
@@ -240,93 +232,82 @@
                                 </div>
                                 <div class="text-right text-rose-600 font-black text-xl">${lateLogs.length} <span class="text-[10px] text-slate-400 font-medium">ครั้ง/เดือน</span></div>
                             </div>
-                            <div class="space-y-2">
-                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">วันที่มาสาย:</p>
-                                <div class="flex flex-wrap gap-2">${lateDates}</div>
-                            </div>
-                        </div>
-                    `;
+                            <div class="space-y-2"><p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">วันที่มาสาย:</p><div class="flex flex-wrap gap-2">${lateDates}</div></div>
+                        </div>`;
                 }
             });
-
             container.innerHTML = html || '<div class="bg-emerald-50 p-6 rounded-3xl text-center border border-emerald-100"><i class="fa-solid fa-trophy text-emerald-500 text-3xl mb-3"></i><p class="text-emerald-700 font-bold text-sm">ยอดเยี่ยม! เดือนนี้ยังไม่มีพนักงานมาสาย</p></div>';
         }
 
         function renderEmployeeList() {
-            const empNames = [...new Set(allData.map(item => item.name).filter(n => n))];
+            const users = [...new Set(allData.map(i => i.userId).filter(u => u))];
             const container = document.getElementById('usersContainer');
             
-            container.innerHTML = empNames.map(name => {
-                const empLogs = allData.filter(item => item.name === name);
-                const lateCount = empLogs.filter(item => item.isLate).length;
+            container.innerHTML = users.map(uid => {
+                const logs = allData.filter(i => i.userId === uid);
+                const name = logs[0].name;
+                const lateCount = logs.filter(i => i.isLate).length;
+                const isUnknown = name.includes("พนักงานใหม่");
 
                 return `
-                    <div onclick="openProfile('${name}')" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center active:scale-95 transition-transform cursor-pointer">
-                        <div class="h-16 w-16 mx-auto rounded-2xl ${lateCount > 3 ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-2xl mb-3 shadow-sm">${name.charAt(0)}</div>
-                        <p class="font-bold text-slate-800">คุณ${name}</p>
-                        <p class="text-[10px] ${lateCount > 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}">${lateCount > 0 ? 'สาย '+lateCount+' ครั้ง' : 'ไม่เคยสาย'}</p>
-                    </div>
-                `;
+                    <div onclick="openProfile('${uid}')" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center active:scale-95 transition-transform cursor-pointer">
+                        <div class="h-16 w-16 mx-auto rounded-2xl ${lateCount > 3 ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-2xl mb-3 shadow-sm">${isUnknown ? '?' : name.charAt(0)}</div>
+                        <p class="font-bold text-slate-800 truncate px-2">${isUnknown ? 'ยังไม่ระบุชื่อ' : 'คุณ'+name}</p>
+                        <p class="text-[10px] ${lateCount > 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}">${isUnknown ? 'กดเพื่อใส่ชื่อ' : (lateCount > 0 ? 'สาย '+lateCount+' ครั้ง' : 'ไม่เคยสาย')}</p>
+                    </div>`;
             }).join('');
         }
 
-        function openProfile(name) {
-            const empLogs = allData.filter(item => item.name === name);
-            const lateLogs = empLogs.filter(item => item.isLate);
+        function openProfile(uid) {
+            const logs = allData.filter(i => i.userId === uid);
+            const lateLogs = logs.filter(i => i.isLate);
+            const name = logs[0].name;
 
-            document.getElementById('modalName').innerText = "คุณ" + name;
-            document.getElementById('modalIcon').innerText = name.charAt(0);
-            document.getElementById('modalDays').innerText = empLogs.length;
+            document.getElementById('modalName').innerHTML = name.includes("พนักงานใหม่") ? `ไม่ระบุชื่อ <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-blue-100 text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>` : `คุณ${name} <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-slate-100 text-slate-400 hover:text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>`;
+            document.getElementById('modalIcon').innerText = name.includes("พนักงานใหม่") ? "?" : name.charAt(0);
+            document.getElementById('modalDays').innerText = logs.length;
             document.getElementById('modalLate').innerText = lateLogs.length;
 
-            const logsHtml = empLogs.slice(0, 10).map(item => {
-                return `
-                    <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div>
-                            <span class="text-xs font-bold text-slate-600 block">${item.dateStr}</span>
-                            ${item.image ? `<button onclick="openImageViewer('${item.image}')" class="text-[10px] text-blue-600 font-bold uppercase tracking-tight mt-1 inline-block hover:bg-blue-50 px-2 py-1 rounded border border-blue-100 transition"><i class="fa-solid fa-image mr-1"></i>ดูรูปในแอป</button>` : ''}
-                        </div>
-                        <span class="text-xs font-black ${item.isLate ? 'text-rose-600' : 'text-slate-900'}">${item.timeStr}</span>
+            document.getElementById('modalLogs').innerHTML = logs.slice(0, 10).map(item => `
+                <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div>
+                        <span class="text-xs font-bold text-slate-600 block">${item.dateStr}</span>
+                        ${item.image ? `<button onclick="openImageViewer('${item.image}')" class="text-[10px] text-blue-600 font-bold uppercase tracking-tight mt-1 hover:underline"><i class="fa-solid fa-image mr-1"></i>ดูรูปในแอป</button>` : ''}
                     </div>
-                `;
-            }).join('');
-
-            document.getElementById('modalLogs').innerHTML = logsHtml || '<p class="text-center text-xs text-slate-400 py-4">ไม่มีประวัติการลงเวลา</p>';
+                    <span class="text-xs font-black ${item.isLate ? 'text-rose-600' : 'text-slate-900'}">${item.timeStr}</span>
+                </div>
+            `).join('') || '<p class="text-center text-xs text-slate-400 py-4">ไม่มีประวัติการลงเวลา</p>';
+            
             document.getElementById('profileModal').classList.remove('translate-y-full');
         }
 
-        function closeProfile() {
-            document.getElementById('profileModal').classList.add('translate-y-full');
+        function closeProfile() { document.getElementById('profileModal').classList.add('translate-y-full'); }
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => { el.classList.remove('nav-active'); el.classList.add('text-slate-300'); });
+            document.getElementById('tab-' + tabId).classList.add('active');
+            document.getElementById('nav-' + tabId).classList.add('nav-active');
+            document.getElementById('nav-' + tabId).classList.remove('text-slate-300');
         }
 
-        // ฟังก์ชันใหม่: แปลงลิงก์ Drive เป็นโหมด Preview เพื่อเปิดใส่ใน iframe (ดูในแอปได้ 100%)
         function openImageViewer(driveUrl) {
             let previewUrl = driveUrl;
-            
-            // ดึงรหัสไฟล์ออกมาแล้วต่อท้ายด้วย /preview 
             const match = driveUrl.match(/\/d\/(.+?)\//);
-            if (match && match[1]) {
-                previewUrl = `https://drive.google.com/file/d/${match[1]}/preview`;
-            } else if (driveUrl.includes('?usp=')) {
-                // กรณีลิงก์แบบอื่น
-                previewUrl = driveUrl.replace('view?usp=drivesdk', 'preview').replace('view?usp=sharing', 'preview');
-            }
-
+            if (match && match[1]) previewUrl = `https://drive.google.com/file/d/${match[1]}/preview`;
+            else if (driveUrl.includes('?usp=')) previewUrl = driveUrl.replace('view?usp=drivesdk', 'preview').replace('view?usp=sharing', 'preview');
+            
             document.getElementById('viewerIframe').src = previewUrl;
             const viewerModal = document.getElementById('imageViewerModal');
-            viewerModal.classList.remove('hidden');
-            viewerModal.classList.add('flex');
+            viewerModal.classList.remove('hidden'); viewerModal.classList.add('flex');
         }
 
         function closeImageViewer() {
             const viewerModal = document.getElementById('imageViewerModal');
-            viewerModal.classList.add('hidden');
-            viewerModal.classList.remove('flex');
-            document.getElementById('viewerIframe').src = ""; // ล้างลิงก์ทิ้งตอนปิด
+            viewerModal.classList.add('hidden'); viewerModal.classList.remove('flex');
+            document.getElementById('viewerIframe').src = ""; 
         }
 
         document.getElementById('dateFilter').addEventListener('change', renderDaily);
-
         fetchData();
     </script>
 </body>
