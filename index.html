@@ -117,55 +117,60 @@
     </div>
 
     <script>
-        // ลิงก์ API (ลิงก์เดิมของคุณทนาย)
         const API_URL = "https://script.google.com/macros/s/AKfycbwSBHeswptojhNiHKeIsgo3cwaTEjOfBqPhJnY8GmGw_abhfPMk87FEA5dGm1j27gLm3A/exec";
         let allData = [];
 
-        // ตั้งค่าวันที่ปัจจุบัน (อิงตาม Local Time ป้องกันปัญหาข้ามวัน)
+        // ตั้งค่าวันที่ปัจจุบัน (ให้ตรงกับเวลาเครื่อง)
         const today = new Date();
         const localDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
         document.getElementById('dateFilter').value = localDate;
 
-        // **จุดสำคัญที่แก้ไข:** ระบบผ่าตัดเวลาขั้นสูง รองรับทั้ง DD/MM/YYYY และ YYYY-MM-DD
+        // ระบบอ่านเวลาแบบ "ตาเห็น" (Literal String Parsing) แก้ปัญหาเวลาเพี้ยน 7 ชั่วโมง
         function formatDateTime(rawString) {
-            if (!rawString) return { dateStr: "", timeStr: "", isLate: false };
-            let cleanStr = String(rawString).replace('T', ' ').replace('Z', '').split('.')[0]; 
-            let parts = cleanStr.split(' ');
-            let d = parts[0]; // ส่วนวันที่
-            let t = parts[1] || "00:00:00"; // ส่วนเวลา
+            if (!rawString || rawString === "undefined") return { dateStr: "", timeStr: "", isLate: false };
             
-            // ถ้าวันที่เป็นแบบไทย (DD/MM/YYYY) ให้สลับเป็นแบบสากล (YYYY-MM-DD) เพื่อให้แอปค้นหาเจอ
+            // ล้างค่าแปลกๆ ทิ้งให้หมด
+            let cleanStr = String(rawString).replace('T', ' ').replace('Z', '').trim();
+            
+            // แยก วันที่ กับ เวลา ออกจากกันด้วย "ช่องว่าง"
+            let parts = cleanStr.split(' ');
+            let d = parts[0] || ""; 
+            let t = parts[1] || "00:00:00"; 
+            
+            // 1. จัดการวันที่: ถ้าเป็น 12/05/2026 ให้สลับเป็น 2026-05-12 เพื่อให้ปฏิทินในแอปหาเจอ
             if (d.includes('/')) {
-                let dParts = d.split('/');
-                if (dParts.length === 3) {
-                    d = dParts[2] + '-' + dParts[1].padStart(2, '0') + '-' + dParts[0].padStart(2, '0');
-                }
+                let dp = d.split('/');
+                if (dp.length === 3) d = `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
             }
 
-            // เติม 0 ให้เวลาถ้าจำเป็น (เช่น 8:15:00 กลายเป็น 08:15:00) ป้องกันการเปรียบเทียบเวลาผิดพลาด
+            // 2. จัดการเวลา: เอาแค่ HH:mm:ss มาใช้ตรงๆ ไม่สน AM/PM
             let tParts = t.split(':');
-            if (tParts.length >= 2) {
-                t = tParts[0].padStart(2, '0') + ':' + tParts[1].padStart(2, '0') + ':' + (tParts[2] ? tParts[2].padStart(2, '0') : '00');
-            }
+            let h = tParts[0].padStart(2, '0');
+            let m = (tParts[1] || '00').padStart(2, '0');
+            let s = (tParts[2] || '00').padStart(2, '0').substring(0, 2);
+            
+            let finalTime = `${h}:${m}:${s}`;
 
-            return { dateStr: d, timeStr: t, isLate: t > "08:40:00" };
+            // 3. เช็คสาย (08:40)
+            let isLate = finalTime > "08:40:00";
+
+            return { dateStr: d, timeStr: finalTime, isLate: isLate };
         }
 
         async function fetchData() {
             try {
                 const response = await fetch(API_URL);
-                const rawData = await response.json();
+                const data = await response.json();
                 
-                allData = rawData.map(item => {
-                    const keys = Object.keys(item);
-                    const timeData = formatDateTime(item[keys[0]]);
+                allData = data.map(item => {
+                    const timeData = formatDateTime(item.time);
                     return {
-                        userId: item[keys[1]] || "", 
+                        userId: item.userId,
                         dateStr: timeData.dateStr,
                         timeStr: timeData.timeStr,
                         isLate: timeData.isLate,
-                        name: item[keys[2]] || "ไม่ระบุ", 
-                        image: item[keys[3]] || "" 
+                        name: item.name || "พนักงานใหม่",
+                        image: item.image
                     };
                 });
                 
@@ -174,7 +179,6 @@
                 renderEmployeeList();
             } catch (error) {
                 console.error(error);
-                document.getElementById('dailyContainer').innerHTML = '<p class="text-center text-rose-500 text-xs py-10">ไม่สามารถเชื่อมต่อฐานข้อมูลได้</p>';
             }
         }
 
@@ -189,14 +193,14 @@
             }
 
             container.innerHTML = dailyData.map(item => {
-                const isUnknown = item.name.includes("พนักงานใหม่");
+                const isUnknown = item.name.includes("พนักงานใหม่") || item.name.trim() === "";
                 return `
                     <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
                         <div class="flex items-center space-x-4">
                             <div class="h-12 w-12 rounded-2xl ${item.isLate ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-xl shadow-sm">${isUnknown ? '?' : item.name.charAt(0)}</div>
                             <div>
                                 <h3 class="font-bold text-slate-800 flex items-center">
-                                    ${isUnknown ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]"><i class="fa-solid fa-pen mr-1"></i>ใส่ชื่อ</button>` : `คุณ${item.name}`}
+                                    ${isUnknown ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]">ใส่ชื่อ</button>` : `คุณ${item.name}`}
                                 </h3>
                                 <p class="text-[11px] ${item.isLate ? 'text-rose-400 font-bold' : 'text-slate-400 font-medium'}">เข้างาน: ${item.timeStr}</p>
                             </div>
@@ -238,22 +242,22 @@
                 const lateLogs = logs.filter(i => i.isLate);
                 const name = logs[0].name;
                 
-                if (lateLogs.length > 0 && !name.includes("พนักงานใหม่")) {
+                if (lateLogs.length > 0) {
                     const lateDates = lateLogs.map(item => `<span class="bg-slate-50 text-slate-600 text-[10px] px-2 py-1 rounded-md border border-slate-100 font-medium shadow-sm">${item.dateStr}</span>`).join('');
                     html += `
                         <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
                             <div class="flex items-center justify-between mb-4">
                                 <div class="flex items-center space-x-3">
-                                    <div class="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-600">${name.charAt(0)}</div>
-                                    <h3 class="font-bold text-slate-800">คุณ${name}</h3>
+                                    <div class="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-600">${name.includes("พนักงานใหม่") ? '?' : name.charAt(0)}</div>
+                                    <h3 class="font-bold text-slate-800">${name.includes("พนักงานใหม่") ? "พนักงานใหม่" : "คุณ"+name}</h3>
                                 </div>
-                                <div class="text-right text-rose-600 font-black text-xl">${lateLogs.length} <span class="text-[10px] text-slate-400 font-medium">ครั้ง/เดือน</span></div>
+                                <div class="text-right text-rose-600 font-black text-xl">${lateLogs.length} <span class="text-[10px] text-slate-400 font-medium">ครั้ง</span></div>
                             </div>
                             <div class="space-y-2"><p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">วันที่มาสาย:</p><div class="flex flex-wrap gap-2">${lateDates}</div></div>
                         </div>`;
                 }
             });
-            container.innerHTML = html || '<div class="bg-emerald-50 p-6 rounded-3xl text-center border border-emerald-100"><i class="fa-solid fa-trophy text-emerald-500 text-3xl mb-3"></i><p class="text-emerald-700 font-bold text-sm">ยอดเยี่ยม! เดือนนี้ยังไม่มีพนักงานมาสาย</p></div>';
+            container.innerHTML = html || '<div class="bg-emerald-50 p-6 rounded-3xl text-center border border-emerald-100"><p class="text-emerald-700 font-bold text-sm">เดือนนี้ยังไม่มีประวัติการสาย</p></div>';
         }
 
         function renderEmployeeList() {
@@ -264,7 +268,7 @@
                 const logs = allData.filter(i => i.userId === uid);
                 const name = logs[0].name;
                 const lateCount = logs.filter(i => i.isLate).length;
-                const isUnknown = name.includes("พนักงานใหม่");
+                const isUnknown = name.includes("พนักงานใหม่") || name.trim() === "";
 
                 return `
                     <div onclick="openProfile('${uid}')" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center active:scale-95 transition-transform cursor-pointer">
@@ -279,9 +283,10 @@
             const logs = allData.filter(i => i.userId === uid);
             const lateLogs = logs.filter(i => i.isLate);
             const name = logs[0].name;
+            const isUnknown = name.includes("พนักงานใหม่") || name.trim() === "";
 
-            document.getElementById('modalName').innerHTML = name.includes("พนักงานใหม่") ? `ไม่ระบุชื่อ <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-blue-100 text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>` : `คุณ${name} <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-slate-100 text-slate-400 hover:text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>`;
-            document.getElementById('modalIcon').innerText = name.includes("พนักงานใหม่") ? "?" : name.charAt(0);
+            document.getElementById('modalName').innerHTML = isUnknown ? `ไม่ระบุชื่อ <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-blue-100 text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>` : `คุณ${name} <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-slate-100 text-slate-400 hover:text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>`;
+            document.getElementById('modalIcon').innerText = isUnknown ? "?" : name.charAt(0);
             document.getElementById('modalDays').innerText = logs.length;
             document.getElementById('modalLate').innerText = lateLogs.length;
 
