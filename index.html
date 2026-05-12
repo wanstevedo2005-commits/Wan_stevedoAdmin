@@ -120,38 +120,50 @@
         const API_URL = "https://script.google.com/macros/s/AKfycbwSBHeswptojhNiHKeIsgo3cwaTEjOfBqPhJnY8GmGw_abhfPMk87FEA5dGm1j27gLm3A/exec";
         let allData = [];
 
-        // ตั้งค่าวันที่ปัจจุบัน (ให้ตรงกับเวลาเครื่อง)
+        // ตั้งค่าวันที่ปัจจุบัน 
         const today = new Date();
         const localDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
         document.getElementById('dateFilter').value = localDate;
 
-        // ระบบอ่านเวลาแบบ "ตาเห็น" (Literal String Parsing) แก้ปัญหาเวลาเพี้ยน 7 ชั่วโมง
+        // ฟังก์ชันครอบจักรวาล: แปลงเวลาได้ทุกรูปแบบ
         function formatDateTime(rawString) {
             if (!rawString || rawString === "undefined") return { dateStr: "", timeStr: "", isLate: false };
             
-            // ล้างค่าแปลกๆ ทิ้งให้หมด
             let cleanStr = String(rawString).replace('T', ' ').replace('Z', '').trim();
-            
-            // แยก วันที่ กับ เวลา ออกจากกันด้วย "ช่องว่าง"
             let parts = cleanStr.split(' ');
+            
             let d = parts[0] || ""; 
             let t = parts[1] || "00:00:00"; 
             
-            // 1. จัดการวันที่: ถ้าเป็น 12/05/2026 ให้สลับเป็น 2026-05-12 เพื่อให้ปฏิทินในแอปหาเจอ
+            // 1. จัดการวันที่ให้อยู่ในฟอร์แมต YYYY-MM-DD
             if (d.includes('/')) {
                 let dp = d.split('/');
-                if (dp.length === 3) d = `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
+                if (dp.length === 3) {
+                    // ถ้าช่องสุดท้ายมี 4 ตัว ถือว่าเป็นปี (DD/MM/YYYY)
+                    if(dp[2].length === 4) {
+                        d = `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
+                    } else if (dp[0].length === 4) {
+                        d = `${dp[0]}-${dp[1].padStart(2,'0')}-${dp[2].padStart(2,'0')}`;
+                    }
+                }
             }
 
-            // 2. จัดการเวลา: เอาแค่ HH:mm:ss มาใช้ตรงๆ ไม่สน AM/PM
+            // 2. จัดการเวลา ให้อยู่ในฟอร์แมต HH:mm:ss (24 ชั่วโมงเสมอ)
             let tParts = t.split(':');
-            let h = tParts[0].padStart(2, '0');
-            let m = (tParts[1] || '00').padStart(2, '0');
-            let s = (tParts[2] || '00').padStart(2, '0').substring(0, 2);
-            
-            let finalTime = `${h}:${m}:${s}`;
+            let h = parseInt(tParts[0] || 0, 10);
+            let m = parseInt(tParts[1] || 0, 10);
+            let s = parseInt(tParts[2] || 0, 10);
 
-            // 3. เช็คสาย (08:40)
+            // เช็กระบบ AM/PM ที่อาจติดมา
+            if (parts.length > 2) {
+                let ampm = parts[2].toUpperCase();
+                if ((ampm === 'PM' || ampm === 'หลังเที่ยง') && h < 12) h += 12;
+                if ((ampm === 'AM' || ampm === 'ก่อนเที่ยง') && h === 12) h = 0;
+            }
+
+            let finalTime = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+
+            // 3. เช็กสาย (08:40)
             let isLate = finalTime > "08:40:00";
 
             return { dateStr: d, timeStr: finalTime, isLate: isLate };
@@ -162,15 +174,24 @@
                 const response = await fetch(API_URL);
                 const data = await response.json();
                 
+                // ระบบดึงข้อมูลแบบครอบจักรวาล (รองรับทั้งเวอร์ชันเก่าและเวอร์ชันใหม่ของ Google Sheets)
                 allData = data.map(item => {
-                    const timeData = formatDateTime(item.time);
+                    const keys = Object.keys(item);
+                    // ถ้าหาคีย์ time ไม่เจอ ให้ไปดึงข้อมูลจากคอลัมน์แรกแทน
+                    const rawTime = item.time || item[keys[0]];
+                    const rawUserId = item.userId || item[keys[1]];
+                    const rawName = item.name || item[keys[2]];
+                    const rawImage = item.image || item[keys[3]];
+
+                    const timeData = formatDateTime(rawTime);
+                    
                     return {
-                        userId: item.userId,
+                        userId: String(rawUserId).trim(),
                         dateStr: timeData.dateStr,
                         timeStr: timeData.timeStr,
                         isLate: timeData.isLate,
-                        name: item.name || "พนักงานใหม่",
-                        image: item.image
+                        name: rawName || "พนักงานใหม่",
+                        image: rawImage
                     };
                 });
                 
@@ -200,7 +221,7 @@
                             <div class="h-12 w-12 rounded-2xl ${item.isLate ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-xl shadow-sm">${isUnknown ? '?' : item.name.charAt(0)}</div>
                             <div>
                                 <h3 class="font-bold text-slate-800 flex items-center">
-                                    ${isUnknown ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]">ใส่ชื่อ</button>` : `คุณ${item.name}`}
+                                    ${isUnknown ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]"><i class="fa-solid fa-pen mr-1"></i>ใส่ชื่อ</button>` : `คุณ${item.name}`}
                                 </h3>
                                 <p class="text-[11px] ${item.isLate ? 'text-rose-400 font-bold' : 'text-slate-400 font-medium'}">เข้างาน: ${item.timeStr}</p>
                             </div>
