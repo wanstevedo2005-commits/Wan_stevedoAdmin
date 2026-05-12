@@ -120,16 +120,19 @@
         const API_URL = "https://script.google.com/macros/s/AKfycbwSBHeswptojhNiHKeIsgo3cwaTEjOfBqPhJnY8GmGw_abhfPMk87FEA5dGm1j27gLm3A/exec";
         let allData = [];
 
-        // ตั้งค่าวันที่ปัจจุบัน 
+        // เซ็ตวันที่ปัจจุบันให้ตรงกับเครื่องผู้ใช้แบบแม่นยำ
         const today = new Date();
-        const localDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        const localDate = today.toLocaleDateString('en-CA'); // ได้ฟอร์แมต YYYY-MM-DD ชัวร์ๆ
         document.getElementById('dateFilter').value = localDate;
 
-        // ฟังก์ชันครอบจักรวาล: แปลงเวลาได้ทุกรูปแบบ
+        // ฟังก์ชันครอบจักรวาล: ล้างปัญหาเวลา 13:00 เป็น 01:00
         function formatDateTime(rawString) {
             if (!rawString || rawString === "undefined") return { dateStr: "", timeStr: "", isLate: false };
             
-            let cleanStr = String(rawString).replace('T', ' ').replace('Z', '').trim();
+            let cleanStr = String(rawString).trim();
+            
+            // กรณีเป็น ISO String (มี T และ Z) ให้ตัดทิ้งให้หมด
+            cleanStr = cleanStr.replace('T', ' ').replace('Z', '').split('.')[0];
             let parts = cleanStr.split(' ');
             
             let d = parts[0] || ""; 
@@ -139,31 +142,35 @@
             if (d.includes('/')) {
                 let dp = d.split('/');
                 if (dp.length === 3) {
-                    // ถ้าช่องสุดท้ายมี 4 ตัว ถือว่าเป็นปี (DD/MM/YYYY)
-                    if(dp[2].length === 4) {
-                        d = `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
-                    } else if (dp[0].length === 4) {
-                        d = `${dp[0]}-${dp[1].padStart(2,'0')}-${dp[2].padStart(2,'0')}`;
-                    }
+                    if(dp[2].length === 4) { d = `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`; } 
+                    else if (dp[0].length === 4) { d = `${dp[0]}-${dp[1].padStart(2,'0')}-${dp[2].padStart(2,'0')}`; }
                 }
+            } else if (d.includes('-')) {
+                let dp = d.split('-');
+                if (dp.length === 3 && dp[2].length === 4) { d = `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`; }
             }
 
-            // 2. จัดการเวลา ให้อยู่ในฟอร์แมต HH:mm:ss (24 ชั่วโมงเสมอ)
+            // 2. จัดการเวลา แปลง AM/PM ให้เป็น 24 ชม.
             let tParts = t.split(':');
             let h = parseInt(tParts[0] || 0, 10);
             let m = parseInt(tParts[1] || 0, 10);
             let s = parseInt(tParts[2] || 0, 10);
 
-            // เช็กระบบ AM/PM ที่อาจติดมา
+            // เช็กระบบ AM/PM ที่อาจจะมาในก้อนข้อมูล
+            let ampm = "";
             if (parts.length > 2) {
-                let ampm = parts[2].toUpperCase();
-                if ((ampm === 'PM' || ampm === 'หลังเที่ยง') && h < 12) h += 12;
-                if ((ampm === 'AM' || ampm === 'ก่อนเที่ยง') && h === 12) h = 0;
+                ampm = parts[2].toUpperCase();
+            } else if (t.toUpperCase().includes('PM') || t.toUpperCase().includes('AM')) {
+                ampm = t.toUpperCase().replace(/[^A-Z]/g, '');
+            }
+
+            if (ampm === 'PM' || ampm === 'หลังเที่ยง') {
+                if (h < 12) h += 12;
+            } else if (ampm === 'AM' || ampm === 'ก่อนเที่ยง') {
+                if (h === 12) h = 0;
             }
 
             let finalTime = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-
-            // 3. เช็กสาย (08:40)
             let isLate = finalTime > "08:40:00";
 
             return { dateStr: d, timeStr: finalTime, isLate: isLate };
@@ -174,14 +181,12 @@
                 const response = await fetch(API_URL);
                 const data = await response.json();
                 
-                // ระบบดึงข้อมูลแบบครอบจักรวาล (รองรับทั้งเวอร์ชันเก่าและเวอร์ชันใหม่ของ Google Sheets)
                 allData = data.map(item => {
-                    const keys = Object.keys(item);
-                    // ถ้าหาคีย์ time ไม่เจอ ให้ไปดึงข้อมูลจากคอลัมน์แรกแทน
-                    const rawTime = item.time || item[keys[0]];
-                    const rawUserId = item.userId || item[keys[1]];
-                    const rawName = item.name || item[keys[2]];
-                    const rawImage = item.image || item[keys[3]];
+                    // รองรับทั้งคีย์ใหม่และคีย์เก่า เพื่อป้องกันแอปพัง
+                    const rawTime = item.time || item[Object.keys(item)[0]];
+                    const rawUserId = item.userId || item[Object.keys(item)[1]];
+                    const rawName = item.name || item[Object.keys(item)[2]];
+                    const rawImage = item.image || item[Object.keys(item)[3]];
 
                     const timeData = formatDateTime(rawTime);
                     
@@ -200,6 +205,7 @@
                 renderEmployeeList();
             } catch (error) {
                 console.error(error);
+                document.getElementById('dailyContainer').innerHTML = '<p class="text-center text-rose-500 text-xs py-10">เกิดข้อผิดพลาดในการดึงข้อมูล</p>';
             }
         }
 
@@ -242,12 +248,8 @@
                 try {
                     const res = await fetch(`${API_URL}?action=update_name&userId=${encodeURIComponent(userId)}&newName=${encodeURIComponent(newName.trim())}`);
                     const data = await res.json();
-                    if (data.status === "success") {
-                        await fetchData(); 
-                    }
-                } catch(e) {
-                    alert("เกิดข้อผิดพลาดในการบันทึกชื่อ");
-                }
+                    if (data.status === "success") { await fetchData(); }
+                } catch(e) { alert("เกิดข้อผิดพลาดในการบันทึกชื่อ"); }
                 document.getElementById('loadingOverlay').classList.add('hidden');
                 document.getElementById('loadingOverlay').classList.remove('flex');
             }
