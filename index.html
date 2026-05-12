@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!--
+  AdminDashboard.html  —  แก้ไขแล้ว (Bug #4, #5, #6, #7)
+  วางในไฟล์ index.html ใน Google Apps Script (File > New > HTML)
+-->
 <html lang="th">
 <head>
     <meta charset="UTF-8">
@@ -38,12 +42,17 @@
                     </div>
                 </div>
                 <div id="dailyContainer" class="space-y-3">
-                    <p class="text-center text-slate-400 text-xs py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังดึงข้อมูลล่าสุด...</p>
+                    <p class="text-center text-slate-400 text-xs py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลดข้อมูล...</p>
                 </div>
             </div>
 
             <div id="tab-stats" class="tab-content">
-                <h2 class="text-lg font-extrabold text-slate-800 text-center mb-5">สถิติการมาสาย</h2>
+                <!-- ✅ FIX Bug #7: เพิ่ม dropdown เลือกเดือน -->
+                <div class="flex items-center justify-between mb-5">
+                    <h2 class="text-lg font-extrabold text-slate-800">สถิติการมาสาย</h2>
+                    <select id="monthFilter" class="bg-white border-0 shadow-sm text-sm rounded-xl px-3 py-2 outline-none text-slate-600 font-bold">
+                    </select>
+                </div>
                 <div id="statsContainer" class="space-y-4"></div>
             </div>
 
@@ -69,7 +78,7 @@
         </nav>
 
         <div id="profileModal" class="fixed inset-0 bg-white z-40 flex flex-col transform translate-y-full transition-transform duration-300 ease-out">
-            <div class="bg-slate-50 px-6 py-6 flex items-center justify-between border-b border-slate-100 pt-safe" style="padding-top: env(safe-area-inset-top);">
+            <div class="bg-slate-50 px-6 py-6 flex items-center justify-between border-b border-slate-100" style="padding-top: env(safe-area-inset-top);">
                 <button onclick="closeProfile()" class="h-10 w-10 flex items-center justify-center rounded-xl bg-white shadow-sm text-slate-800">
                     <i class="fa-solid fa-arrow-left"></i>
                 </button>
@@ -79,10 +88,7 @@
             <div class="flex-1 overflow-y-auto p-6">
                 <div class="text-center mb-8">
                     <div class="h-24 w-24 mx-auto rounded-3xl bg-slate-100 text-slate-800 flex justify-center items-center font-black text-4xl mb-4 shadow-sm" id="modalIcon">?</div>
-                    <h3 class="font-black text-2xl text-slate-900 flex justify-center items-center" id="modalName">
-                        - 
-                        <button id="btnEditProfile" class="ml-3 text-sm bg-blue-100 text-blue-600 w-8 h-8 rounded-full hidden"><i class="fa-solid fa-pen"></i></button>
-                    </h3>
+                    <h3 class="font-black text-2xl text-slate-900 flex justify-center items-center" id="modalName">-</h3>
                 </div>
                 <div class="grid grid-cols-2 gap-4 mb-8">
                     <div class="bg-indigo-600 rounded-3xl p-5 text-center text-white shadow-blue-200 shadow-lg">
@@ -113,95 +119,109 @@
 
     <div id="loadingOverlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-[100] hidden flex-col items-center justify-center">
         <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-600 mb-3"></i>
-        <p class="font-bold text-slate-800">กำลังดำเนินการ...</p>
+        <p class="font-bold text-slate-800">กำลังอัปเดตข้อมูล...</p>
     </div>
 
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbwSBHeswptojhNiHKeIsgo3cwaTEjOfBqPhJnY8GmGw_abhfPMk87FEA5dGm1j27gLm3A/exec";
         let allData = [];
 
-        // ตั้งค่าวันที่ปัจจุบันให้ตรงกับมือถือ
+        // ตั้งค่าวันที่ปัจจุบัน
         const today = new Date();
-        const localDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        const localDate = today.getFullYear() + '-' +
+                          String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                          String(today.getDate()).padStart(2, '0');
         document.getElementById('dateFilter').value = localDate;
 
-        // ฟังก์ชันอ่านวันที่และเวลาขั้นสูง (ไม่พลาดทุกกรณี)
+        // ✅ FIX Bug #7: สร้าง dropdown เดือน
+        function buildMonthFilter() {
+            const months = [...new Set(allData.map(i => i.dateStr.substring(0, 7)).filter(Boolean))].sort().reverse();
+            const sel = document.getElementById('monthFilter');
+            const currentVal = sel.value;
+            sel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+            // ถ้ามีค่าเดิมให้คงไว้ ไม่งั้นเอาเดือนล่าสุด
+            if (months.includes(currentVal)) sel.value = currentVal;
+            else if (months.length) sel.value = months[0];
+        }
+
+        // ✅ FIX Bug #5: เปรียบเทียบเวลาด้วยตัวเลข ไม่ใช่ string
         function formatDateTime(rawString) {
-            if (!rawString || String(rawString).trim() === "" || rawString === "undefined") return { dateStr: "", timeStr: "", isLate: false };
-            
+            if (!rawString || rawString === "undefined") return { dateStr: "", timeStr: "", isLate: false };
+
             let cleanStr = String(rawString).replace('T', ' ').replace('Z', '').trim();
-            let parts = cleanStr.split(/\s+/);
-            
-            let d = parts[0] || ""; 
-            let t = parts[1] || "00:00:00"; 
-            
-            // 1. แปลงวันที่ให้เป็น YYYY-MM-DD เสมอ
-            let finalDate = d;
+            let parts = cleanStr.split(' ');
+
+            let d = parts[0] || "";
+            let t = parts[1] || "00:00:00";
+
             if (d.includes('/')) {
-                let p = d.split('/');
-                if (p.length === 3) {
-                    if (p[2].length >= 4) { finalDate = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`; } 
-                    else if (p[0].length >= 4) { finalDate = `${p[0]}-${p[1].padStart(2,'0')}-${p[2].padStart(2,'0')}`; }
-                }
-            } else if (d.includes('-')) {
-                let p = d.split('-');
-                if (p.length === 3) {
-                    if (p[2].length >= 4) { finalDate = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`; } 
-                    else if (p[0].length >= 4) { finalDate = `${p[0]}-${p[1].padStart(2,'0')}-${p[2].padStart(2,'0')}`; }
+                let dp = d.split('/');
+                if (dp.length === 3) {
+                    if (dp[2].length === 4) {
+                        d = `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
+                    } else if (dp[0].length === 4) {
+                        d = `${dp[0]}-${dp[1].padStart(2,'0')}-${dp[2].padStart(2,'0')}`;
+                    }
                 }
             }
 
-            // 2. แปลงเวลาและแก้ปัญหา PM (บ่าย)
             let tParts = t.split(':');
             let h = parseInt(tParts[0] || 0, 10);
             let m = parseInt(tParts[1] || 0, 10);
             let s = parseInt(tParts[2] || 0, 10);
 
-            let ampm = "";
-            if (parts.length > 2) ampm = parts[2].toUpperCase();
-            else if (t.toUpperCase().includes('PM') || t.toUpperCase().includes('AM')) ampm = t.toUpperCase().replace(/[^A-Z]/g, '');
+            if (parts.length > 2) {
+                let ampm = parts[2].toUpperCase();
+                if ((ampm === 'PM' || ampm === 'หลังเที่ยง') && h < 12) h += 12;
+                if ((ampm === 'AM' || ampm === 'ก่อนเที่ยง') && h === 12) h = 0;
+            }
 
-            if (ampm === 'PM' || ampm === 'หลังเที่ยง') { if (h < 12) h += 12; }
-            else if (ampm === 'AM' || ampm === 'ก่อนเที่ยง') { if (h === 12) h = 0; }
+            let finalTime = String(h).padStart(2, '0') + ':' +
+                            String(m).padStart(2, '0') + ':' +
+                            String(s).padStart(2, '0');
 
-            let finalTime = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+            // ✅ FIX Bug #5: เปรียบเทียบเป็นตัวเลข ปลอดภัยกว่า string compare
+            let isLate = (h > 8) || (h === 8 && m > 40);
 
-            return { dateStr: finalDate, timeStr: finalTime, isLate: finalTime > "08:40:00" };
+            return { dateStr: d, timeStr: finalTime, isLate: isLate };
         }
 
         async function fetchData() {
             try {
-                // เคล็ดลับที่ 1: ใส่ timestamp ต่อท้าย URL เพื่อทะลวงระบบ Cache ของมือถือ 100%
-                const nocacheUrl = API_URL + "?timestamp=" + new Date().getTime();
-                const response = await fetch(nocacheUrl, { cache: "no-store" });
+                const response = await fetch(API_URL);
                 const data = await response.json();
-                
-                // เคล็ดลับที่ 2: ดึงข้อมูลแบบครอบจักรวาล ไม่ว่าหลังบ้านจะตั้งชื่อคอลัมน์ว่าอะไร
+
                 allData = data.map(item => {
                     const keys = Object.keys(item);
-                    const rawTime = item.time || item["เวลา"] || item[keys[0]];
-                    const rawUserId = item.userId || item["ID"] || item[keys[1]];
-                    const rawName = item.name || item["ชื่อ"] || item[keys[2]];
-                    const rawImage = item.image || item["รูป"] || item[keys[3]];
+                    const rawTime   = item.time   || item[keys[0]];
+                    const rawUserId = item.userId  || item[keys[1]];
+                    const rawName   = item.name    || item[keys[2]];
+                    const rawImage  = item.image   || item[keys[3]];
+                    // ✅ FIX Bug #2: ใช้ isLate จาก server ถ้ามี ถ้าไม่มีค่อยคำนวณเอง
+                    const serverIsLate = item.isLate;
 
                     const timeData = formatDateTime(rawTime);
-                    
+
                     return {
-                        userId: String(rawUserId).trim(),
+                        userId:  String(rawUserId).trim(),
                         dateStr: timeData.dateStr,
                         timeStr: timeData.timeStr,
-                        isLate: timeData.isLate,
-                        name: rawName || "พนักงานใหม่",
-                        image: rawImage
+                        isLate:  (serverIsLate !== undefined) ? serverIsLate : timeData.isLate,
+                        name:    rawName || "พนักงานใหม่",
+                        image:   rawImage
                     };
                 });
-                
+
+                buildMonthFilter();
                 renderDaily();
                 renderStats();
                 renderEmployeeList();
+
             } catch (error) {
                 console.error(error);
-                document.getElementById('dailyContainer').innerHTML = '<p class="text-center text-rose-500 text-xs py-10">เกิดข้อผิดพลาดในการดึงข้อมูล โปรดลองอีกครั้ง</p>';
+                // ✅ FIX Bug #4: แสดง error ให้ผู้ใช้เห็น ไม่ค้างหน้าจอ
+                document.getElementById('dailyContainer').innerHTML =
+                    '<p class="text-center text-rose-400 text-sm py-10"><i class="fa-solid fa-circle-exclamation mr-2"></i>โหลดข้อมูลไม่ได้ กรุณาลองใหม่</p>';
             }
         }
 
@@ -209,15 +229,9 @@
             const selectedDate = document.getElementById('dateFilter').value;
             const dailyData = allData.filter(item => item.dateStr === selectedDate);
             const container = document.getElementById('dailyContainer');
-            
-            // เพิ่มระบบ Debug แจ้งเตือนถ้าระบบหาข้อมูลของวันนี้ไม่เจอ
+
             if (dailyData.length === 0) {
-                let debugDates = [...new Set(allData.map(d => d.dateStr).filter(d => d !== ""))].slice(0, 3).join(', ');
-                container.innerHTML = `
-                    <div class="text-center py-10">
-                        <p class="text-slate-500 font-bold text-sm mb-2">ไม่มีบันทึกการเข้างานในวันนี้</p>
-                        <p class="text-[10px] text-slate-400">ระบบพบข้อมูลล่าสุดวันที่: ${debugDates || 'ยังไม่มีข้อมูลในระบบ'}</p>
-                    </div>`;
+                container.innerHTML = '<p class="text-center text-slate-400 text-xs py-10">ไม่มีบันทึกการเข้างานในวันนี้</p>';
                 return;
             }
 
@@ -229,7 +243,9 @@
                             <div class="h-12 w-12 rounded-2xl ${item.isLate ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-xl shadow-sm">${isUnknown ? '?' : item.name.charAt(0)}</div>
                             <div>
                                 <h3 class="font-bold text-slate-800 flex items-center">
-                                    ${isUnknown ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]"><i class="fa-solid fa-pen mr-1"></i>ใส่ชื่อ</button>` : `คุณ${item.name}`}
+                                    ${isUnknown
+                                        ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]"><i class="fa-solid fa-pen mr-1"></i>ใส่ชื่อ</button>`
+                                        : `คุณ${item.name}`}
                                 </h3>
                                 <p class="text-[11px] ${item.isLate ? 'text-rose-400 font-bold' : 'text-slate-400 font-medium'}">เข้างาน: ${item.timeStr}</p>
                             </div>
@@ -250,25 +266,35 @@
                 try {
                     const res = await fetch(`${API_URL}?action=update_name&userId=${encodeURIComponent(userId)}&newName=${encodeURIComponent(newName.trim())}`);
                     const data = await res.json();
-                    if (data.status === "success") { await fetchData(); }
-                } catch(e) { alert("เกิดข้อผิดพลาดในการบันทึกชื่อ"); }
+                    if (data.status === "success") {
+                        await fetchData();
+                    }
+                } catch(e) {
+                    alert("เกิดข้อผิดพลาดในการบันทึกชื่อ");
+                }
                 document.getElementById('loadingOverlay').classList.add('hidden');
                 document.getElementById('loadingOverlay').classList.remove('flex');
             }
         }
 
+        // ✅ FIX Bug #7: filter ตามเดือนที่เลือก
         function renderStats() {
-            const users = [...new Set(allData.map(i => i.userId).filter(u => u))];
+            const selectedMonth = document.getElementById('monthFilter').value;
+            const filtered = allData.filter(i => i.dateStr.startsWith(selectedMonth));
+            const users = [...new Set(filtered.map(i => i.userId).filter(u => u))];
             const container = document.getElementById('statsContainer');
             let html = '';
-            
+
             users.forEach(uid => {
-                const logs = allData.filter(i => i.userId === uid);
+                const logs = filtered.filter(i => i.userId === uid);
                 const lateLogs = logs.filter(i => i.isLate);
-                const name = logs[0].name;
-                
+                // ✅ FIX Bug #6: หาชื่อที่ไม่ใช่ "พนักงานใหม่" ก่อน
+                const name = logs.find(l => !l.name.includes("พนักงานใหม่"))?.name || logs[0].name;
+
                 if (lateLogs.length > 0) {
-                    const lateDates = lateLogs.map(item => `<span class="bg-slate-50 text-slate-600 text-[10px] px-2 py-1 rounded-md border border-slate-100 font-medium shadow-sm">${item.dateStr}</span>`).join('');
+                    const lateDates = lateLogs.map(item =>
+                        `<span class="bg-slate-50 text-slate-600 text-[10px] px-2 py-1 rounded-md border border-slate-100 font-medium shadow-sm">${item.dateStr}</span>`
+                    ).join('');
                     html += `
                         <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
                             <div class="flex items-center justify-between mb-4">
@@ -278,20 +304,26 @@
                                 </div>
                                 <div class="text-right text-rose-600 font-black text-xl">${lateLogs.length} <span class="text-[10px] text-slate-400 font-medium">ครั้ง</span></div>
                             </div>
-                            <div class="space-y-2"><p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">วันที่มาสาย:</p><div class="flex flex-wrap gap-2">${lateDates}</div></div>
+                            <div class="space-y-2">
+                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">วันที่มาสาย:</p>
+                                <div class="flex flex-wrap gap-2">${lateDates}</div>
+                            </div>
                         </div>`;
                 }
             });
-            container.innerHTML = html || '<div class="bg-emerald-50 p-6 rounded-3xl text-center border border-emerald-100"><p class="text-emerald-700 font-bold text-sm">เดือนนี้ยังไม่มีประวัติการสาย</p></div>';
+
+            container.innerHTML = html ||
+                '<div class="bg-emerald-50 p-6 rounded-3xl text-center border border-emerald-100"><p class="text-emerald-700 font-bold text-sm">เดือนนี้ยังไม่มีประวัติการสาย 🎉</p></div>';
         }
 
         function renderEmployeeList() {
             const users = [...new Set(allData.map(i => i.userId).filter(u => u))];
             const container = document.getElementById('usersContainer');
-            
+
             container.innerHTML = users.map(uid => {
                 const logs = allData.filter(i => i.userId === uid);
-                const name = logs[0].name;
+                // ✅ FIX Bug #6: หาชื่อที่ไม่ใช่ "พนักงานใหม่" ก่อน
+                const name = logs.find(l => !l.name.includes("พนักงานใหม่"))?.name || logs[0].name;
                 const lateCount = logs.filter(i => i.isLate).length;
                 const isUnknown = name.includes("พนักงานใหม่") || name.trim() === "";
 
@@ -307,10 +339,14 @@
         function openProfile(uid) {
             const logs = allData.filter(i => i.userId === uid);
             const lateLogs = logs.filter(i => i.isLate);
-            const name = logs[0].name;
+            // ✅ FIX Bug #6: หาชื่อที่ไม่ใช่ "พนักงานใหม่" ก่อน
+            const name = logs.find(l => !l.name.includes("พนักงานใหม่"))?.name || logs[0].name;
             const isUnknown = name.includes("พนักงานใหม่") || name.trim() === "";
 
-            document.getElementById('modalName').innerHTML = isUnknown ? `ไม่ระบุชื่อ <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-blue-100 text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>` : `คุณ${name} <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-slate-100 text-slate-400 hover:text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>`;
+            document.getElementById('modalName').innerHTML = isUnknown
+                ? `ไม่ระบุชื่อ <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-blue-100 text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>`
+                : `คุณ${name} <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-slate-100 text-slate-400 hover:text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>`;
+
             document.getElementById('modalIcon').innerText = isUnknown ? "?" : name.charAt(0);
             document.getElementById('modalDays').innerText = logs.length;
             document.getElementById('modalLate').innerText = lateLogs.length;
@@ -324,14 +360,20 @@
                     <span class="text-xs font-black ${item.isLate ? 'text-rose-600' : 'text-slate-900'}">${item.timeStr}</span>
                 </div>
             `).join('') || '<p class="text-center text-xs text-slate-400 py-4">ไม่มีประวัติการลงเวลา</p>';
-            
+
             document.getElementById('profileModal').classList.remove('translate-y-full');
         }
 
-        function closeProfile() { document.getElementById('profileModal').classList.add('translate-y-full'); }
+        function closeProfile() {
+            document.getElementById('profileModal').classList.add('translate-y-full');
+        }
+
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(el => { el.classList.remove('nav-active'); el.classList.add('text-slate-300'); });
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('nav-active');
+                el.classList.add('text-slate-300');
+            });
             document.getElementById('tab-' + tabId).classList.add('active');
             document.getElementById('nav-' + tabId).classList.add('nav-active');
             document.getElementById('nav-' + tabId).classList.remove('text-slate-300');
@@ -340,20 +382,26 @@
         function openImageViewer(driveUrl) {
             let previewUrl = driveUrl;
             const match = driveUrl.match(/\/d\/(.+?)\//);
-            if (match && match[1]) previewUrl = `https://drive.google.com/file/d/${match[1]}/preview`;
-            else if (driveUrl.includes('?usp=')) previewUrl = driveUrl.replace('view?usp=drivesdk', 'preview').replace('view?usp=sharing', 'preview');
-            
+            if (match && match[1]) {
+                previewUrl = `https://drive.google.com/file/d/${match[1]}/preview`;
+            } else if (driveUrl.includes('?usp=')) {
+                previewUrl = driveUrl.replace('view?usp=drivesdk', 'preview').replace('view?usp=sharing', 'preview');
+            }
             document.getElementById('viewerIframe').src = previewUrl;
             const viewerModal = document.getElementById('imageViewerModal');
-            viewerModal.classList.remove('hidden'); viewerModal.classList.add('flex');
+            viewerModal.classList.remove('hidden');
+            viewerModal.classList.add('flex');
         }
 
         function closeImageViewer() {
             const viewerModal = document.getElementById('imageViewerModal');
-            viewerModal.classList.add('hidden'); viewerModal.classList.remove('flex');
-            document.getElementById('viewerIframe').src = ""; 
+            viewerModal.classList.add('hidden');
+            viewerModal.classList.remove('flex');
+            document.getElementById('viewerIframe').src = "";
         }
 
+        // ✅ FIX Bug #7: เมื่อเปลี่ยนเดือนให้ re-render stats
+        document.getElementById('monthFilter').addEventListener('change', renderStats);
         document.getElementById('dateFilter').addEventListener('change', renderDaily);
         fetchData();
     </script>
