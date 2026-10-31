@@ -187,14 +187,14 @@
         async function adminRequest(action, payload = {}) {
             await Promise.race([
                 bridgeReady,
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Admin bridge timeout.')), 12000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Admin bridge timeout.')), 30000))
             ]);
             const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
             const data = await new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     pendingBridgeRequests.delete(id);
                     reject(new Error('Admin request timeout.'));
-                }, 15000);
+                }, 60000);
                 pendingBridgeRequests.set(id, { resolve, reject, timeout });
                 bridgeWindow.postMessage({
                     type: 'admin-request', id, request: { action, apiKey: adminKey, ...payload }
