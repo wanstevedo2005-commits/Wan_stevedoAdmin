@@ -194,7 +194,7 @@
                 const timeout = setTimeout(() => {
                     pendingBridgeRequests.delete(id);
                     reject(new Error('Admin request timeout.'));
-                }, 60000);
+                }, 120000);
                 pendingBridgeRequests.set(id, { resolve, reject, timeout });
                 bridgeWindow.postMessage({
                     type: 'admin-request', id, request: { action, apiKey: adminKey, ...payload }
