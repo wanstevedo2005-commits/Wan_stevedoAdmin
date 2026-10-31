@@ -17,6 +17,10 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         body { background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
         .nav-active { color: #2563eb !important; }
+        :focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        }
     </style>
 </head>
 <body class="text-slate-800 font-sans pb-20">
@@ -33,12 +37,28 @@
             </div>
         </header>
 
-        <main class="p-4">
+        <section id="authPanel" class="p-6" aria-labelledby="authTitle">
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h2 id="authTitle" class="text-2xl font-black text-slate-900">เข้าสู่ระบบผู้ดูแล</h2>
+                <p class="text-sm text-slate-600 mt-2">กรอกคีย์ผู้ดูแลระบบ คีย์จะอยู่เฉพาะในแท็บนี้และไม่ถูกบันทึกลง URL</p>
+                <form id="authForm" class="mt-5 space-y-4">
+                    <div>
+                        <label for="adminKey" class="block text-sm font-bold text-slate-700 mb-2">คีย์ผู้ดูแลระบบ</label>
+                        <input type="password" id="adminKey" required autocomplete="current-password" class="w-full min-h-12 bg-slate-50 border border-slate-300 rounded-xl px-4 text-base" placeholder="กรอก ADMIN_API_KEY">
+                    </div>
+                    <p id="authError" class="hidden text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3" role="alert"></p>
+                    <button id="authSubmit" type="submit" class="w-full min-h-12 bg-blue-600 text-white rounded-xl font-bold disabled:opacity-50">เข้าสู่ Admin Console</button>
+                </form>
+            </div>
+        </section>
+
+        <main id="adminContent" class="p-4 hidden">
             <div id="tab-daily" class="tab-content active">
                 <div class="flex items-center justify-between mb-5">
                     <h2 class="text-lg font-extrabold">บันทึกเวลาวันนี้</h2>
                     <div class="relative">
-                        <input type="date" id="dateFilter" class="bg-white border-0 shadow-sm text-sm rounded-xl px-4 py-2 outline-none text-slate-600 font-bold">
+                        <label for="dateFilter" class="sr-only">เลือกวันที่</label>
+                        <input type="date" id="dateFilter" class="bg-white border border-slate-200 shadow-sm text-base rounded-xl px-4 py-2 text-slate-700 font-bold">
                     </div>
                 </div>
                 <div id="dailyContainer" class="space-y-3">
@@ -50,7 +70,8 @@
                 <!-- ✅ FIX Bug #7: เพิ่ม dropdown เลือกเดือน -->
                 <div class="flex items-center justify-between mb-5">
                     <h2 class="text-lg font-extrabold text-slate-800">สถิติการมาสาย</h2>
-                    <select id="monthFilter" class="bg-white border-0 shadow-sm text-sm rounded-xl px-3 py-2 outline-none text-slate-600 font-bold">
+                    <label for="monthFilter" class="sr-only">เลือกเดือน</label>
+                    <select id="monthFilter" class="bg-white border border-slate-200 shadow-sm text-base rounded-xl px-3 py-2 text-slate-700 font-bold">
                     </select>
                 </div>
                 <div id="statsContainer" class="space-y-4"></div>
@@ -63,23 +84,23 @@
         </main>
 
         <nav class="fixed bottom-0 w-full max-w-md bg-white/90 backdrop-blur-md border-t border-slate-100 flex justify-around items-center pt-3 px-2 z-30 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)]" style="padding-bottom: env(safe-area-inset-bottom);">
-            <button onclick="switchTab('daily')" id="nav-daily" class="nav-btn w-1/3 py-2 flex flex-col items-center nav-active transition-all">
+            <button onclick="switchTab('daily')" id="nav-daily" aria-pressed="true" aria-label="บันทึกประจำวัน" class="nav-btn w-1/3 min-h-12 py-2 flex flex-col items-center nav-active transition-all">
                 <i class="fa-solid fa-calendar-check text-xl mb-1"></i>
-                <span class="text-[9px] font-black uppercase">Daily</span>
+                <span class="text-xs font-bold">รายวัน</span>
             </button>
-            <button onclick="switchTab('stats')" id="nav-stats" class="nav-btn w-1/3 py-2 flex flex-col items-center text-slate-300 transition-all">
+            <button onclick="switchTab('stats')" id="nav-stats" aria-pressed="false" aria-label="ประวัติการมาสาย" class="nav-btn w-1/3 min-h-12 py-2 flex flex-col items-center text-slate-400 transition-all">
                 <i class="fa-solid fa-chart-pie text-xl mb-1"></i>
-                <span class="text-[9px] font-black uppercase">History</span>
+                <span class="text-xs font-bold">สถิติ</span>
             </button>
-            <button onclick="switchTab('users')" id="nav-users" class="nav-btn w-1/3 py-2 flex flex-col items-center text-slate-300 transition-all">
+            <button onclick="switchTab('users')" id="nav-users" aria-pressed="false" aria-label="ทะเบียนพนักงาน" class="nav-btn w-1/3 min-h-12 py-2 flex flex-col items-center text-slate-400 transition-all">
                 <i class="fa-solid fa-users text-xl mb-1"></i>
-                <span class="text-[9px] font-black uppercase">Staff</span>
+                <span class="text-xs font-bold">พนักงาน</span>
             </button>
         </nav>
 
-        <div id="profileModal" class="fixed inset-0 bg-white z-40 flex flex-col transform translate-y-full transition-transform duration-300 ease-out">
+        <div id="profileModal" role="dialog" aria-modal="true" aria-labelledby="modalName" class="fixed inset-0 bg-white z-40 hidden flex-col">
             <div class="bg-slate-50 px-6 py-6 flex items-center justify-between border-b border-slate-100" style="padding-top: env(safe-area-inset-top);">
-                <button onclick="closeProfile()" class="h-10 w-10 flex items-center justify-center rounded-xl bg-white shadow-sm text-slate-800">
+                <button onclick="closeProfile()" aria-label="ปิดประวัติพนักงาน" class="h-11 w-11 flex items-center justify-center rounded-xl bg-white shadow-sm text-slate-800">
                     <i class="fa-solid fa-arrow-left"></i>
                 </button>
                 <span class="font-black text-slate-900">Personnel Record</span>
@@ -105,11 +126,11 @@
             </div>
         </div>
 
-        <div id="imageViewerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex-col items-center justify-center p-4">
+        <div id="imageViewerModal" role="dialog" aria-modal="true" aria-label="หลักฐานการลงเวลา" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex-col items-center justify-center p-4">
             <div class="w-full h-[80vh] max-w-lg bg-white rounded-2xl overflow-hidden relative shadow-2xl flex flex-col">
                 <div class="bg-slate-900 px-4 py-3 flex justify-between items-center">
                     <span class="text-white text-sm font-bold"><i class="fa-solid fa-image mr-2"></i>หลักฐานการลงเวลา</span>
-                    <button onclick="closeImageViewer()" class="bg-rose-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-rose-600"><i class="fa-solid fa-xmark"></i></button>
+                    <button onclick="closeImageViewer()" aria-label="ปิดรูปหลักฐาน" class="bg-rose-600 text-white rounded-full w-11 h-11 flex items-center justify-center hover:bg-rose-700"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <iframe id="viewerIframe" src="" class="w-full flex-1 border-0 bg-slate-100"></iframe>
             </div>
@@ -123,8 +144,33 @@
     </div>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbwSBHeswptojhNiHKeIsgo3cwaTEjOfBqPhJnY8GmGw_abhfPMk87FEA5dGm1j27gLm3A/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbwt1q2lwvbCFxkIJ49XTvRH6hKejC1RwRsNEZnPUMIvICzdyf9HrG44NvKt_Jmhy6bUNg/exec";
+        const ADMIN_KEY_STORAGE = "timeAttendanceAdminKey";
         let allData = [];
+        let adminKey = sessionStorage.getItem(ADMIN_KEY_STORAGE) || "";
+
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>'"]/g, character => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            })[character]);
+        }
+
+        async function adminRequest(action, payload = {}) {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                redirect: 'follow',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action, apiKey: adminKey, ...payload })
+            });
+            if (!response.ok) throw new Error(`เซิร์ฟเวอร์ตอบกลับ ${response.status}`);
+            const data = await response.json();
+            if (data && data.status === 'error') {
+                const error = new Error(data.message || 'คำขอไม่สำเร็จ');
+                error.isUnauthorized = data.message === 'Unauthorized.';
+                throw error;
+            }
+            return data;
+        }
 
         // ตั้งค่าวันที่ปัจจุบัน
         const today = new Date();
@@ -138,7 +184,7 @@
             const months = [...new Set(allData.map(i => i.dateStr.substring(0, 7)).filter(Boolean))].sort().reverse();
             const sel = document.getElementById('monthFilter');
             const currentVal = sel.value;
-            sel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+            sel.innerHTML = months.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
             // ถ้ามีค่าเดิมให้คงไว้ ไม่งั้นเอาเดือนล่าสุด
             if (months.includes(currentVal)) sel.value = currentVal;
             else if (months.length) sel.value = months[0];
@@ -188,8 +234,8 @@
 
         async function fetchData() {
             try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
+                const data = await adminRequest('admin_logs');
+                if (!Array.isArray(data)) throw new Error('รูปแบบข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง');
 
                 allData = data.map(item => {
                     const keys = Object.keys(item);
@@ -216,12 +262,25 @@
                 renderDaily();
                 renderStats();
                 renderEmployeeList();
+                document.getElementById('authPanel').classList.add('hidden');
+                document.getElementById('adminContent').classList.remove('hidden');
 
             } catch (error) {
                 console.error(error);
-                // ✅ FIX Bug #4: แสดง error ให้ผู้ใช้เห็น ไม่ค้างหน้าจอ
-                document.getElementById('dailyContainer').innerHTML =
-                    '<p class="text-center text-rose-400 text-sm py-10"><i class="fa-solid fa-circle-exclamation mr-2"></i>โหลดข้อมูลไม่ได้ กรุณาลองใหม่</p>';
+                if (error.isUnauthorized) {
+                    sessionStorage.removeItem(ADMIN_KEY_STORAGE);
+                    adminKey = '';
+                    document.getElementById('adminContent').classList.add('hidden');
+                    document.getElementById('authPanel').classList.remove('hidden');
+                    const authError = document.getElementById('authError');
+                    authError.textContent = 'คีย์ผู้ดูแลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่';
+                    authError.classList.remove('hidden');
+                    document.getElementById('adminKey').focus();
+                } else {
+                    document.getElementById('dailyContainer').innerHTML =
+                        '<div class="text-center text-rose-700 text-sm py-10"><p>โหลดข้อมูลไม่ได้ กรุณาลองใหม่</p><button type="button" onclick="fetchData()" class="mt-4 min-h-11 px-4 bg-rose-600 text-white rounded-xl font-bold">ลองอีกครั้ง</button></div>';
+                }
+                throw error;
             }
         }
 
@@ -240,14 +299,14 @@
                 return `
                     <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
                         <div class="flex items-center space-x-4">
-                            <div class="h-12 w-12 rounded-2xl ${item.isLate ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-xl shadow-sm">${isUnknown ? '?' : item.name.charAt(0)}</div>
+                            <div class="h-12 w-12 rounded-2xl ${item.isLate ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-xl shadow-sm">${isUnknown ? '?' : escapeHtml(item.name.charAt(0))}</div>
                             <div>
                                 <h3 class="font-bold text-slate-800 flex items-center">
                                     ${isUnknown
-                                        ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button onclick="editNamePrompt('${item.userId}')" class="ml-2 bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px]"><i class="fa-solid fa-pen mr-1"></i>ใส่ชื่อ</button>`
-                                        : `คุณ${item.name}`}
+                                        ? `<span class="text-rose-500">ยังไม่ระบุชื่อ</span> <button type="button" data-user-id="${escapeHtml(item.userId)}" class="js-edit-name ml-2 min-h-11 bg-blue-100 text-blue-700 px-3 rounded text-sm"><i class="fa-solid fa-pen mr-1"></i>ใส่ชื่อ</button>`
+                                        : `คุณ${escapeHtml(item.name)}`}
                                 </h3>
-                                <p class="text-[11px] ${item.isLate ? 'text-rose-400 font-bold' : 'text-slate-400 font-medium'}">เข้างาน: ${item.timeStr}</p>
+                                <p class="text-sm ${item.isLate ? 'text-rose-700 font-bold' : 'text-slate-600 font-medium'}">เข้างาน: ${escapeHtml(item.timeStr)}</p>
                             </div>
                         </div>
                         <span class="${item.isLate ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'} px-3 py-1 rounded-lg text-[10px] font-black uppercase border">
@@ -264,13 +323,14 @@
                 document.getElementById('loadingOverlay').classList.remove('hidden');
                 document.getElementById('loadingOverlay').classList.add('flex');
                 try {
-                    const res = await fetch(`${API_URL}?action=update_name&userId=${encodeURIComponent(userId)}&newName=${encodeURIComponent(newName.trim())}`);
-                    const data = await res.json();
+                    const data = await adminRequest('update_name', { userId, newName: newName.trim() });
                     if (data.status === "success") {
                         await fetchData();
+                    } else {
+                        throw new Error(data.message || 'บันทึกชื่อไม่สำเร็จ');
                     }
                 } catch(e) {
-                    alert("เกิดข้อผิดพลาดในการบันทึกชื่อ");
+                    alert(e.isUnauthorized ? "คีย์ผู้ดูแลหมดอายุ กรุณาเข้าสู่ระบบใหม่" : "เกิดข้อผิดพลาดในการบันทึกชื่อ");
                 }
                 document.getElementById('loadingOverlay').classList.add('hidden');
                 document.getElementById('loadingOverlay').classList.remove('flex');
@@ -293,14 +353,14 @@
 
                 if (lateLogs.length > 0) {
                     const lateDates = lateLogs.map(item =>
-                        `<span class="bg-slate-50 text-slate-600 text-[10px] px-2 py-1 rounded-md border border-slate-100 font-medium shadow-sm">${item.dateStr}</span>`
+                        `<span class="bg-slate-50 text-slate-600 text-xs px-2 py-1 rounded-md border border-slate-100 font-medium">${escapeHtml(item.dateStr)}</span>`
                     ).join('');
                     html += `
                         <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
                             <div class="flex items-center justify-between mb-4">
                                 <div class="flex items-center space-x-3">
-                                    <div class="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-600">${name.includes("พนักงานใหม่") ? '?' : name.charAt(0)}</div>
-                                    <h3 class="font-bold text-slate-800">${name.includes("พนักงานใหม่") ? "พนักงานใหม่" : "คุณ"+name}</h3>
+                                    <div class="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-600">${name.includes("พนักงานใหม่") ? '?' : escapeHtml(name.charAt(0))}</div>
+                                    <h3 class="font-bold text-slate-800">${name.includes("พนักงานใหม่") ? "พนักงานใหม่" : "คุณ"+escapeHtml(name)}</h3>
                                 </div>
                                 <div class="text-right text-rose-600 font-black text-xl">${lateLogs.length} <span class="text-[10px] text-slate-400 font-medium">ครั้ง</span></div>
                             </div>
@@ -328,11 +388,11 @@
                 const isUnknown = name.includes("พนักงานใหม่") || name.trim() === "";
 
                 return `
-                    <div onclick="openProfile('${uid}')" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center active:scale-95 transition-transform cursor-pointer">
-                        <div class="h-16 w-16 mx-auto rounded-2xl ${lateCount > 3 ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-2xl mb-3 shadow-sm">${isUnknown ? '?' : name.charAt(0)}</div>
-                        <p class="font-bold text-slate-800 truncate px-2">${isUnknown ? 'ยังไม่ระบุชื่อ' : 'คุณ'+name}</p>
+                    <button type="button" data-user-id="${escapeHtml(uid)}" class="js-open-profile bg-white p-6 rounded-2xl border border-slate-200 text-center active:scale-95 transition-transform cursor-pointer">
+                        <div class="h-16 w-16 mx-auto rounded-2xl ${lateCount > 3 ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'} flex justify-center items-center font-bold text-2xl mb-3">${isUnknown ? '?' : escapeHtml(name.charAt(0))}</div>
+                        <p class="font-bold text-slate-800 truncate px-2">${isUnknown ? 'ยังไม่ระบุชื่อ' : 'คุณ'+escapeHtml(name)}</p>
                         <p class="text-[10px] ${lateCount > 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}">${isUnknown ? 'กดเพื่อใส่ชื่อ' : (lateCount > 0 ? 'สาย '+lateCount+' ครั้ง' : 'ไม่เคยสาย')}</p>
-                    </div>`;
+                    </button>`;
             }).join('');
         }
 
@@ -344,8 +404,8 @@
             const isUnknown = name.includes("พนักงานใหม่") || name.trim() === "";
 
             document.getElementById('modalName').innerHTML = isUnknown
-                ? `ไม่ระบุชื่อ <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-blue-100 text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>`
-                : `คุณ${name} <button onclick="editNamePrompt('${uid}'); closeProfile();" class="ml-2 text-sm bg-slate-100 text-slate-400 hover:text-blue-600 w-8 h-8 rounded-full"><i class="fa-solid fa-pen"></i></button>`;
+                ? `ไม่ระบุชื่อ <button type="button" aria-label="ใส่ชื่อพนักงาน" data-user-id="${escapeHtml(uid)}" class="js-edit-name ml-2 text-sm bg-blue-100 text-blue-700 w-11 h-11 rounded-full"><i class="fa-solid fa-pen"></i></button>`
+                : `คุณ${escapeHtml(name)} <button type="button" aria-label="แก้ไขชื่อพนักงาน" data-user-id="${escapeHtml(uid)}" class="js-edit-name ml-2 text-sm bg-slate-100 text-slate-600 hover:text-blue-700 w-11 h-11 rounded-full"><i class="fa-solid fa-pen"></i></button>`;
 
             document.getElementById('modalIcon').innerText = isUnknown ? "?" : name.charAt(0);
             document.getElementById('modalDays').innerText = logs.length;
@@ -354,18 +414,23 @@
             document.getElementById('modalLogs').innerHTML = logs.slice(0, 10).map(item => `
                 <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
                     <div>
-                        <span class="text-xs font-bold text-slate-600 block">${item.dateStr}</span>
-                        ${item.image ? `<button onclick="openImageViewer('${item.image}')" class="text-[10px] text-blue-600 font-bold uppercase tracking-tight mt-1 hover:underline"><i class="fa-solid fa-image mr-1"></i>ดูรูปในแอป</button>` : ''}
+                        <span class="text-xs font-bold text-slate-600 block">${escapeHtml(item.dateStr)}</span>
+                        ${item.image ? `<button type="button" data-image-url="${escapeHtml(item.image)}" class="js-open-image min-h-11 text-sm text-blue-700 font-bold mt-1 hover:underline"><i class="fa-solid fa-image mr-1"></i>ดูรูปในแอป</button>` : ''}
                     </div>
-                    <span class="text-xs font-black ${item.isLate ? 'text-rose-600' : 'text-slate-900'}">${item.timeStr}</span>
+                    <span class="text-xs font-black ${item.isLate ? 'text-rose-600' : 'text-slate-900'}">${escapeHtml(item.timeStr)}</span>
                 </div>
             `).join('') || '<p class="text-center text-xs text-slate-400 py-4">ไม่มีประวัติการลงเวลา</p>';
 
-            document.getElementById('profileModal').classList.remove('translate-y-full');
+            const modal = document.getElementById('profileModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            modal.querySelector('button').focus();
         }
 
         function closeProfile() {
-            document.getElementById('profileModal').classList.add('translate-y-full');
+            const modal = document.getElementById('profileModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
         }
 
         function switchTab(tabId) {
@@ -377,9 +442,17 @@
             document.getElementById('tab-' + tabId).classList.add('active');
             document.getElementById('nav-' + tabId).classList.add('nav-active');
             document.getElementById('nav-' + tabId).classList.remove('text-slate-300');
+            document.querySelectorAll('.nav-btn').forEach(el => el.setAttribute('aria-pressed', 'false'));
+            document.getElementById('nav-' + tabId).setAttribute('aria-pressed', 'true');
         }
 
         function openImageViewer(driveUrl) {
+            let parsedUrl;
+            try { parsedUrl = new URL(driveUrl); } catch (_) { alert('ลิงก์รูปไม่ถูกต้อง'); return; }
+            if (parsedUrl.protocol !== 'https:' || !['drive.google.com', 'docs.google.com'].includes(parsedUrl.hostname)) {
+                alert('เปิดได้เฉพาะรูปจาก Google Drive');
+                return;
+            }
             let previewUrl = driveUrl;
             const match = driveUrl.match(/\/d\/(.+?)\//);
             if (match && match[1]) {
@@ -403,7 +476,49 @@
         // ✅ FIX Bug #7: เมื่อเปลี่ยนเดือนให้ re-render stats
         document.getElementById('monthFilter').addEventListener('change', renderStats);
         document.getElementById('dateFilter').addEventListener('change', renderDaily);
-        fetchData();
+        document.addEventListener('click', event => {
+            const editButton = event.target.closest('.js-edit-name');
+            if (editButton) {
+                if (!document.getElementById('profileModal').classList.contains('hidden')) closeProfile();
+                editNamePrompt(editButton.dataset.userId);
+                return;
+            }
+            const profileButton = event.target.closest('.js-open-profile');
+            if (profileButton) {
+                openProfile(profileButton.dataset.userId);
+                return;
+            }
+            const imageButton = event.target.closest('.js-open-image');
+            if (imageButton) openImageViewer(imageButton.dataset.imageUrl);
+        });
+        document.getElementById('authForm').addEventListener('submit', async event => {
+            event.preventDefault();
+            const submit = document.getElementById('authSubmit');
+            const authError = document.getElementById('authError');
+            adminKey = document.getElementById('adminKey').value.trim();
+            authError.classList.add('hidden');
+            submit.disabled = true;
+            submit.textContent = 'กำลังตรวจสอบ...';
+            try {
+                sessionStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
+                await fetchData();
+                document.getElementById('adminKey').value = '';
+            } catch (error) {
+                if (!error.isUnauthorized) {
+                    authError.textContent = 'เชื่อมต่อระบบไม่ได้ กรุณาลองใหม่';
+                    authError.classList.remove('hidden');
+                }
+            } finally {
+                submit.disabled = false;
+                submit.textContent = 'เข้าสู่ Admin Console';
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape') return;
+            if (!document.getElementById('imageViewerModal').classList.contains('hidden')) closeImageViewer();
+            else if (!document.getElementById('profileModal').classList.contains('hidden')) closeProfile();
+        });
+        if (adminKey) fetchData().catch(() => {});
     </script>
 </body>
 </html>
