@@ -171,8 +171,11 @@
             if (!pending) return;
             pendingBridgeRequests.delete(event.data.id);
             clearTimeout(pending.timeout);
-            if (event.data.error) pending.reject(new Error(event.data.error));
-            else pending.resolve(event.data.data);
+            if (event.data.error) {
+                const error = new Error(event.data.error);
+                error.isUnauthorized = String(event.data.error).includes('Unauthorized.');
+                pending.reject(error);
+            } else pending.resolve(event.data.data);
         });
 
         function escapeHtml(value) {
