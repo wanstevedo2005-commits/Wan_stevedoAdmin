@@ -148,6 +148,32 @@
         const ADMIN_KEY_STORAGE = "timeAttendanceAdminKey";
         let allData = [];
         let adminKey = sessionStorage.getItem(ADMIN_KEY_STORAGE) || "";
+        let bridgeWindow = null;
+        let bridgeReadyResolve;
+        const bridgeReady = new Promise(resolve => { bridgeReadyResolve = resolve; });
+        const pendingBridgeRequests = new Map();
+
+        const bridgeFrame = document.createElement('iframe');
+        bridgeFrame.hidden = true;
+        bridgeFrame.title = 'Admin API bridge';
+        bridgeFrame.src = `${API_URL}?adminBridge=1`;
+        document.body.appendChild(bridgeFrame);
+
+        window.addEventListener('message', event => {
+            if (!event.data || typeof event.data !== 'object') return;
+            if (event.data.type === 'admin-bridge-ready') {
+                bridgeWindow = event.source;
+                bridgeReadyResolve();
+                return;
+            }
+            if (event.data.type !== 'admin-response' || event.source !== bridgeWindow) return;
+            const pending = pendingBridgeRequests.get(event.data.id);
+            if (!pending) return;
+            pendingBridgeRequests.delete(event.data.id);
+            clearTimeout(pending.timeout);
+            if (event.data.error) pending.reject(new Error(event.data.error));
+            else pending.resolve(event.data.data);
+        });
 
         function escapeHtml(value) {
             return String(value ?? "").replace(/[&<>'"]/g, character => ({
@@ -156,14 +182,21 @@
         }
 
         async function adminRequest(action, payload = {}) {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                redirect: 'follow',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action, apiKey: adminKey, ...payload })
+            await Promise.race([
+                bridgeReady,
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Admin bridge timeout.')), 12000))
+            ]);
+            const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const data = await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    pendingBridgeRequests.delete(id);
+                    reject(new Error('Admin request timeout.'));
+                }, 15000);
+                pendingBridgeRequests.set(id, { resolve, reject, timeout });
+                bridgeWindow.postMessage({
+                    type: 'admin-request', id, request: { action, apiKey: adminKey, ...payload }
+                }, '*');
             });
-            if (!response.ok) throw new Error(`เซิร์ฟเวอร์ตอบกลับ ${response.status}`);
-            const data = await response.json();
             if (data && data.status === 'error') {
                 const error = new Error(data.message || 'คำขอไม่สำเร็จ');
                 error.isUnauthorized = data.message === 'Unauthorized.';
